@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
-import { Badge } from "./ui";
+import { Badge, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useAuth } from "../features/auth/AuthProvider";
 import { useWorkingCycle } from "../features/cycles/useCycle";
@@ -70,6 +70,74 @@ function NotificationBell() {
     >
       {enabled ? "🔔" : "🔕"}
     </button>
+  );
+}
+
+/**
+ * One-time card asking this device to turn notifications on.
+ *
+ * The bell alone was not enough: it is a small icon nobody thinks to press, and
+ * the result was zero rows in push_subscriptions — every notification the
+ * database sent went to nobody. Enabling also needs a real tap, because
+ * Notification.requestPermission() must be driven by a user gesture.
+ *
+ * Shown until the device either enables notifications or dismisses the card.
+ */
+const PUSH_PROMPT_KEY = "vegs.pushPromptDismissed";
+
+function NotificationPrompt() {
+  const { profile } = useAuth();
+  const toast = useToast();
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!pushSupported() || !profile) return;
+    if (localStorage.getItem(PUSH_PROMPT_KEY) === "1") return;
+    // Already denied at the OS level: the card cannot help, so stay quiet.
+    if (Notification.permission === "denied") return;
+    void isPushEnabled().then((on) => setShow(!on));
+  }, [profile]);
+
+  if (!show || !profile) return null;
+
+  function dismiss() {
+    localStorage.setItem(PUSH_PROMPT_KEY, "1");
+    setShow(false);
+  }
+
+  async function enable() {
+    setBusy(true);
+    try {
+      const result = await enablePush(profile!.id);
+      if (result === "denied") {
+        toast.error(t.notificationsDenied);
+      } else {
+        toast.success(t.notificationsOn);
+      }
+      dismiss();
+    } catch {
+      toast.error(t.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-600/20">
+      <p className="text-sm font-semibold text-brand-800">
+        🔔 {t.enableNotifications}
+      </p>
+      <p className="mt-1 text-xs text-brand-700">{t.notificationsWhy}</p>
+      <div className="mt-3 flex gap-2">
+        <Button className="flex-1" busy={busy} onClick={() => void enable()}>
+          {t.notificationsEnableNow}
+        </Button>
+        <Button variant="secondary" onClick={dismiss}>
+          {t.notificationsLater}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -145,6 +213,7 @@ export function Layout() {
       </header>
 
       <main className="p-4">
+        <NotificationPrompt />
         <Outlet />
       </main>
 

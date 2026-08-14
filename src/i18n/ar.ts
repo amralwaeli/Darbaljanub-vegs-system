@@ -48,6 +48,8 @@ export const ar: Strings = {
     COMPLETED: "مكتملة",
   } as Record<string, string>,
   noActiveCycle: "لا توجد دورة طلبات نشطة",
+  readyToOrder:
+    "عدّل أي كمية بالأعلى، ثم افتح تبويب واتساب لإرسال الطلب إلى الموردين. الإرسال يقفل هذه الدورة ويفتح التالية.",
   noOrderYet:
     "لم يُرسل أي طلب إلى السوق بعد. راجع طلبات المحلات في الصفحة الرئيسية ثم اقفلها لبدء طلب.",
   startCycle: "بدء دورة اليوم",
@@ -69,6 +71,13 @@ export const ar: Strings = {
   remove: "حذف",
   removeItemConfirm: "حذف هذا الصنف من الطلب؟",
   requestLocked: "الدورة مقفلة — لا يمكن تعديل الطلب بعد الآن.",
+  sendRequest: "إرسال الطلب إلى المدير",
+  sendRequestConfirm:
+    "إرسال هذه القائمة إلى المدير؟ لن تتمكن من تعديلها بعد الإرسال — يمكن للمدير تعديل الكميات عند الحاجة.",
+  requestSent: "تم إرسال الطلب إلى المدير",
+  requestSentNote: "تم إرسال هذا الطلب. المدير وحده يمكنه تعديل الكميات الآن.",
+  requestDraftBadge: "مسودة",
+  requestSentBadge: "تم الإرسال",
   requestEmpty: "لا توجد أصناف بعد. أضف ما يحتاجه محلك.",
   requestNewItem: "طلب صنف جديد",
   newItemName: "اسم الصنف",
@@ -152,6 +161,20 @@ export const ar: Strings = {
   notes: "ملاحظات",
   addCatalogItem: "إضافة صنف",
   emojiLabel: "رمز",
+  // WhatsApp order message sent to market vendors
+  waOrderTitle: "طلب",
+  waTo: "إلى",
+  waLineCount: "عدد الأصناف",
+  waFooter: "الرجاء تأكيد التوفر. شكراً!",
+  // Keyed by the values in UNITS (lib/types.ts).
+  units: {
+    kg: "كجم",
+    box: "صندوق",
+    bag: "كيس",
+    piece: "حبة",
+    bunch: "ربطة",
+    carton: "كرتون",
+  } as Record<string, string>,
   approve: "موافقة",
   pendingApproval: "بانتظار الموافقة",
   inviteUser: "دعوة مستخدم",
@@ -191,6 +214,10 @@ export const ar: Strings = {
   notificationsOff: "تم إيقاف الإشعارات",
   notificationsDenied:
     "الإشعارات محظورة — اسمح بها من إعدادات المتصفح أو التطبيق",
+  notificationsWhy:
+    "استلم تنبيهات على هذا الجهاز للخطوات التي تخص دورك — الطلبات الجديدة والأسعار والتحميل والتوصيل.",
+  notificationsEnableNow: "تفعيل",
+  notificationsLater: "لاحقاً",
 
   // generic
   loading: "جارٍ التحميل…",

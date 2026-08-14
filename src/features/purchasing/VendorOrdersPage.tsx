@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useWorkingCycle } from "../cycles/useCycle";
+import { useOrderingCycle, cycleKeys } from "../cycles/useCycle";
 import { aggregateRequests, fetchAllRequests } from "../../lib/api/requests";
 import {
   fetchVendorOrders,
@@ -29,13 +29,15 @@ const vendorOrdersKey = (cycleId: string) =>
 export default function VendorOrdersPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { data: cycle, isLoading: cycleLoading } = useWorkingCycle();
+  const { data: cycle, isLoading: cycleLoading } = useOrderingCycle();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [vendorId, setVendorId] = useState("");
 
   const cycleId = cycle?.id ?? "";
+  // OPEN is included: sending the first order is what locks the cycle, so the
+  // manager must be able to send while it is still open.
   const ready =
-    cycle && ["ORDERED", "PURCHASED"].includes(cycle.status);
+    cycle && ["OPEN", "ORDERED", "PURCHASED"].includes(cycle.status);
 
   const { data: requests, isLoading } = useQuery({
     queryKey: allRequestsKey(cycleId),
@@ -91,6 +93,9 @@ export default function VendorOrdersPage() {
       setSelected(new Set());
       setVendorId("");
       void queryClient.invalidateQueries({ queryKey: vendorOrdersKey(cycleId) });
+      // The first vendor order moves this cycle OPEN -> ORDERED server-side
+      // (0012) and opens the next one, so re-read both.
+      void queryClient.invalidateQueries({ queryKey: cycleKeys.all });
     },
     onError: (e) =>
       toast.error(e instanceof ApiError ? e.message : t.errorGeneric),
@@ -148,10 +153,10 @@ export default function VendorOrdersPage() {
                     ✓
                   </span>
                   <span className="flex-1 font-semibold">
-                    {agg.emoji ?? "🥬"} {agg.name}
+                    {agg.name}
                   </span>
                   <span className="font-bold text-brand-700">
-                    {fmtQty(agg.total_qty, agg.unit)}
+                    {fmtQty(agg.total_qty)}
                   </span>
                 </button>
               );

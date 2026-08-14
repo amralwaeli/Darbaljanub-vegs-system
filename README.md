@@ -23,10 +23,20 @@ lives in `src/i18n/ar.ts` + `src/i18n/en.ts`; the two files are type-locked
 to the same shape, so a missing translation is a compile error.
 
 **Notifications**: real Web Push (works with the app closed, on installed
-Android/iOS PWAs and desktop) for three events — a PIC submits a request
-(→ managers), a driver marks Loaded (→ managers + that store's PIC), and
-costs become ready (→ all PICs). Fired by database triggers, so they cannot
-be skipped by a client. Setup in §5b.
+Android/iOS PWAs and desktop), routed **by role** so each person only hears
+about the steps that concern them:
+
+| Event | Goes to |
+| --- | --- |
+| A store files its first item | managers + superadmin |
+| Order locked and sent to market | PICs |
+| Costs entered (cycle → PURCHASED) | PICs |
+| Loads ready (cycle → PURCHASED) | drivers |
+| Driver marks Loaded | managers + that store's PIC |
+| Store confirms receipt | managers + superadmin |
+
+Fired by database triggers, so they cannot be skipped by a client. Setup
+in §5b.
 
 ---
 
@@ -168,7 +178,8 @@ the full header-based CSP + HSTS on top of the meta tag.
 ## 5b. Push notifications setup (one-time, ~5 minutes)
 
 Pushes are sent by the `send-push` Edge Function, triggered directly by the
-database (pg_net) on: request submitted / delivery loaded / costs ready.
+database (pg_net). The event → role matrix is in the table above; the triggers
+live in migrations 0008 and 0010.
 
 1. **Generate VAPID keys** (once, anywhere):
    ```sh

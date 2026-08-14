@@ -183,9 +183,9 @@ export default function DeliveryDetailPage() {
                     row.checked ? "text-gray-400 line-through" : ""
                   }`}
                 >
-                  {row.item_emoji ?? "🥬"} {row.item_name}
+                  {row.item_name}
                 </span>
-                <span className="font-bold">{fmtQty(row.qty, row.unit)}</span>
+                <span className="font-bold">{fmtQty(row.qty)}</span>
               </label>
             </li>
           ))}

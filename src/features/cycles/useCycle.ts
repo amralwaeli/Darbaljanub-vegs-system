@@ -29,6 +29,25 @@ export function useWorkingCycle() {
   });
 }
 
+/**
+ * The cycle the manager is placing vendor orders against.
+ *
+ * Before the first vendor order that is the OPEN cycle (whose SUBMITTED
+ * requests are what gets ordered). Sending the first order flips it to
+ * ORDERED and 0009 immediately opens a fresh OPEN cycle behind it — so from
+ * then on we must follow the in-flight one, or the manager would lose the
+ * order they are still sending to their other vendors.
+ */
+export function useOrderingCycle() {
+  const working = useWorkingCycle();
+  const open = useOpenCycle();
+  const inFlight = working.data && working.data.status !== "COMPLETED";
+  return {
+    data: inFlight ? working.data : open.data,
+    isLoading: working.isLoading || open.isLoading,
+  };
+}
+
 export function useSetCycleStatus() {
   const queryClient = useQueryClient();
   return useMutation({

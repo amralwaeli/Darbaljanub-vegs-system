@@ -11,7 +11,11 @@ import type { Database } from "../database.types";
 const FULL_SELECT =
   "*, store:stores(id,name), request_items(*, item:items(id,name,emoji,default_unit))";
 
-/** Manager/superadmin: every store's request in a cycle, with lines. */
+/**
+ * Manager/superadmin: every store's request in a cycle, with lines.
+ * SUBMITTED only — a draft is a list the store is still building, and it must
+ * not reach the aggregate the manager orders against.
+ */
 export async function fetchAllRequests(
   cycleId: string,
 ): Promise<StoreRequestFull[]> {
@@ -19,6 +23,7 @@ export async function fetchAllRequests(
     .from("store_requests")
     .select(FULL_SELECT)
     .eq("cycle_id", cycleId)
+    .eq("status", "SUBMITTED")
     .order("created_at")
     .returns<StoreRequestFull[]>();
   return must(data, error);
@@ -46,6 +51,21 @@ export async function createStoreRequest(
   const { data, error } = await supabase
     .from("store_requests")
     .insert({ cycle_id: cycleId, store_id: storeId, created_by: userId })
+    .select()
+    .single();
+  return must(data, error);
+}
+
+/**
+ * Send the finished list to the manager. One-way (enforced by
+ * store_requests_guard): after this the PIC cannot edit, and the push
+ * notification to managers fires off this transition.
+ */
+export async function submitStoreRequest(id: string): Promise<StoreRequest> {
+  const { data, error } = await supabase
+    .from("store_requests")
+    .update({ status: "SUBMITTED" })
+    .eq("id", id)
     .select()
     .single();
   return must(data, error);

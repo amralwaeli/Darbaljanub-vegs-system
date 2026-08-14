@@ -31,18 +31,32 @@ const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com
 const APP_URL = Deno.env.get("APP_URL") ?? "/";
 
 // All staff are Arabic speakers — notifications are sent in Arabic.
+// Each message is written for the ROLE that receives it (see 0010 for the
+// event -> recipient matrix), never as a generic broadcast.
 const MESSAGES = {
   request_submitted: (store: string) => ({
     title: "🛒 طلب جديد",
-    body: `أرسل ${store} طلب اليوم`,
+    body: `أرسل ${store} طلب اليوم — يمكنك إرساله إلى السوق عبر واتساب`,
+  }),
+  order_sent: () => ({
+    title: "📤 أُرسل الطلب",
+    body: "أُرسل طلب اليوم إلى السوق — لا يمكن تعديل القائمة بعد الآن",
+  }),
+  costs_ready: () => ({
+    title: "💰 الأسعار جاهزة",
+    body: "أدخل المدير أسعار التكلفة — حدّد أسعار البيع الآن",
+  }),
+  deliveries_ready: () => ({
+    title: "📦 حمولات جاهزة",
+    body: "تم الشراء — الحمولات جاهزة للتحميل والتوصيل",
   }),
   delivery_loaded: (store: string) => ({
     title: "🚚 تم التحميل",
     body: `تم تحميل بضاعة ${store} — في الطريق`,
   }),
-  costs_ready: () => ({
-    title: "💰 الأسعار جاهزة",
-    body: "أدخل المدير أسعار التكلفة — حدّد أسعار البيع الآن",
+  delivery_received: (store: string) => ({
+    title: "✅ تم الاستلام",
+    body: `أكد ${store} استلام البضاعة`,
   }),
 } as const;
 
@@ -78,15 +92,30 @@ Deno.serve(async (req) => {
       return data?.name ?? "محل";
     };
 
-    if (event === "request_submitted") {
+    // Everyone holding one of these roles, active only.
+    const byRole = async (...roles: string[]): Promise<string[]> => {
       const { data } = await admin
         .from("profiles")
         .select("id")
-        .in("role", ["manager", "superadmin"])
+        .in("role", roles)
         .eq("is_active", true);
-      userIds = (data ?? []).map((p) => p.id);
+      return (data ?? []).map((p) => p.id);
+    };
+
+    if (event === "request_submitted") {
+      userIds = await byRole("manager", "superadmin");
       message = MESSAGES.request_submitted(await storeName(record.store_id));
+    } else if (event === "order_sent") {
+      userIds = await byRole("pic");
+      message = MESSAGES.order_sent();
+    } else if (event === "costs_ready") {
+      userIds = await byRole("pic");
+      message = MESSAGES.costs_ready();
+    } else if (event === "deliveries_ready") {
+      userIds = await byRole("driver");
+      message = MESSAGES.deliveries_ready();
     } else if (event === "delivery_loaded") {
+      // Managers plus the one PIC whose store this delivery belongs to.
       const { data } = await admin
         .from("profiles")
         .select("id")
@@ -96,14 +125,9 @@ Deno.serve(async (req) => {
         );
       userIds = (data ?? []).map((p) => p.id);
       message = MESSAGES.delivery_loaded(await storeName(record.store_id));
-    } else if (event === "costs_ready") {
-      const { data } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("role", "pic")
-        .eq("is_active", true);
-      userIds = (data ?? []).map((p) => p.id);
-      message = MESSAGES.costs_ready();
+    } else if (event === "delivery_received") {
+      userIds = await byRole("manager", "superadmin");
+      message = MESSAGES.delivery_received(await storeName(record.store_id));
     } else {
       return new Response("unknown event", { status: 400 });
     }

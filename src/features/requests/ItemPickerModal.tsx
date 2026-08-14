@@ -80,33 +80,23 @@ export function ItemPickerModal({
     <Modal open={open} title={t.addItem} onClose={onClose}>
       {selected ? (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <span>{selected.emoji ?? "🥬"}</span>
-            {selected.name}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label={t.qty}
-              type="number"
-              inputMode="decimal"
-              min="0.1"
-              step="0.1"
-              autoFocus
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-            />
-            <Select
-              label={t.unit}
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-            >
-              {UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <div className="text-lg font-semibold">{selected.name}</div>
+          {/*
+            No unit picker: each item carries its own unit, set once when the
+            item is created. That is what lets every list show just a name and
+            a number — two rows of the same item can never mean different
+            things, so there is nothing for the PIC to get wrong.
+          */}
+          <Input
+            label={t.qty}
+            type="number"
+            inputMode="decimal"
+            min="0.1"
+            step="0.1"
+            autoFocus
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+          />
           <div className="flex gap-2">
             <Button
               variant="secondary"
@@ -141,7 +131,7 @@ export function ItemPickerModal({
           >
             {UNITS.map((u) => (
               <option key={u} value={u}>
-                {u}
+                {t.units[u]}
               </option>
             ))}
           </Select>
@@ -183,11 +173,7 @@ export function ItemPickerModal({
                     className="flex min-h-12 w-full items-center gap-3 px-1 py-2 text-start active:bg-brand-50"
                     onClick={() => selectItem(item)}
                   >
-                    <span className="text-xl">{item.emoji ?? "🥬"}</span>
                     <span className="flex-1 font-medium">{item.name}</span>
-                    <span className="text-xs text-gray-400">
-                      {item.default_unit}
-                    </span>
                   </button>
                 </li>
               ))}

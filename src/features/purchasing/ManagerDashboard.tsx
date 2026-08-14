@@ -1,17 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  useOpenCycle,
-  useWorkingCycle,
-  useSetCycleStatus,
-  cycleKeys,
-} from "../cycles/useCycle";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOpenCycle, useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
-import { aggregateRequests, fetchAllRequests } from "../../lib/api/requests";
-import { ConfirmDialog } from "../../components/Modal";
+import {
+  aggregateRequests,
+  fetchAllRequests,
+  updateRequestItem,
+} from "../../lib/api/requests";
 import {
   Badge,
-  Button,
   Card,
   EmptyState,
   PageTitle,
@@ -27,13 +24,12 @@ export const allRequestsKey = (cycleId: string) =>
 
 export default function ManagerDashboard() {
   const toast = useToast();
+  const queryClient = useQueryClient();
   // Branches file into the OPEN cycle, which always exists. The working cycle
   // is the order already sent to the market, if one is still out.
   const { data: cycle, isLoading: cycleLoading } = useOpenCycle();
   const { data: working } = useWorkingCycle();
-  const setStatus = useSetCycleStatus();
   const [tab, setTab] = useState<"stores" | "aggregated">("stores");
-  const [confirm, setConfirm] = useState<"lock" | null>(null);
 
   const cycleId = cycle?.id ?? "";
   const orderInFlight = Boolean(working && working.status !== "COMPLETED");
@@ -53,6 +49,14 @@ export default function ManagerDashboard() {
 
   const onApiError = (e: unknown) =>
     toast.error(e instanceof ApiError ? e.message : t.errorGeneric);
+
+  const qtyMutation = useMutation({
+    mutationFn: ({ id, qty }: { id: string; qty: number }) =>
+      updateRequestItem(id, { requested_qty: qty }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: allRequestsKey(cycleId) }),
+    onError: onApiError,
+  });
 
   if (cycleLoading) return <SkeletonList />;
 
@@ -107,12 +111,28 @@ export default function ManagerDashboard() {
                     key={line.id}
                     className="flex items-center justify-between py-1.5"
                   >
-                    <span>
-                      {line.item.emoji ?? "🥬"} {line.item.name}
-                    </span>
-                    <span className="font-semibold">
-                      {fmtQty(line.requested_qty, line.unit)}
-                    </span>
+                    <span className="flex-1">{line.item.name}</span>
+                    {/* The store can no longer touch a sent request, so the
+                        manager owns the numbers from here on. */}
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0.1"
+                      step="0.1"
+                      aria-label={line.item.name}
+                      className="min-h-10 w-20 rounded-lg border border-gray-300 px-2 text-center font-semibold"
+                      defaultValue={line.requested_qty}
+                      onBlur={(e) => {
+                        const value = Number(e.target.value);
+                        if (
+                          Number.isFinite(value) &&
+                          value > 0 &&
+                          value !== Number(line.requested_qty)
+                        ) {
+                          qtyMutation.mutate({ id: line.id, qty: value });
+                        }
+                      }}
+                    />
                   </li>
                 ))}
               </ul>
@@ -124,11 +144,9 @@ export default function ManagerDashboard() {
           {aggregated.map((agg) => (
             <Card key={`${agg.item_id}|${agg.unit}`}>
               <div className="flex items-center justify-between">
-                <span className="font-semibold">
-                  {agg.emoji ?? "🥬"} {agg.name}
-                </span>
+                <span className="font-semibold">{agg.name}</span>
                 <span className="text-lg font-bold text-brand-700">
-                  {fmtQty(agg.total_qty, agg.unit)}
+                  {fmtQty(agg.total_qty)}
                 </span>
               </div>
               <p className="mt-1 text-xs text-gray-400">
@@ -147,25 +165,13 @@ export default function ManagerDashboard() {
         </p>
       )}
 
+      {/* No "lock the cycle" step: sending the order to a vendor on the
+          WhatsApp tab is what closes this cycle (migration 0012). */}
       {(requests ?? []).length > 0 && !orderInFlight && (
-        <Button className="mt-4 w-full" onClick={() => setConfirm("lock")}>
-          🔒 {t.lockCycle}
-        </Button>
+        <p className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          {t.readyToOrder}
+        </p>
       )}
-
-      <ConfirmDialog
-        open={confirm === "lock"}
-        title={t.lockCycle}
-        message={t.lockCycleConfirm}
-        busy={setStatus.isPending}
-        onCancel={() => setConfirm(null)}
-        onConfirm={() =>
-          setStatus.mutate(
-            { id: cycle.id, status: "ORDERED" },
-            { onSuccess: () => setConfirm(null), onError: onApiError },
-          )
-        }
-      />
     </>
   );
 }

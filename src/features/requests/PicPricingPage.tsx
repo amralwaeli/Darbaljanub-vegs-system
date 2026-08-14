@@ -124,10 +124,9 @@ export default function PicPricingPage() {
                 className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-black/5"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{line.item.emoji ?? "🥬"}</span>
                   <span className="flex-1 font-semibold">{line.item.name}</span>
                   <span className="text-sm text-gray-500">
-                    {fmtQty(line.purchased_qty ?? line.requested_qty, line.unit)}
+                    {fmtQty(line.purchased_qty ?? line.requested_qty)}
                   </span>
                 </div>
                 <div className="mt-2 grid grid-cols-3 items-end gap-2 text-sm">

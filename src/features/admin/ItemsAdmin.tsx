@@ -21,7 +21,6 @@ export function ItemsAdmin() {
   const [editing, setEditing] = useState<Item | "new" | null>(null);
   const [name, setName] = useState("");
   const [unit, setUnit] = useState<string>("kg");
-  const [emoji, setEmoji] = useState("");
 
   const { data: items, isLoading } = useQuery({
     queryKey: ["items", "all"],
@@ -42,13 +41,11 @@ export function ItemsAdmin() {
         return createItem({
           name,
           default_unit: unit,
-          emoji: emoji.trim() || null,
         });
       }
       return updateItem(editing!.id, {
         name: name.trim(),
         default_unit: unit,
-        emoji: emoji.trim() || null,
       });
     },
     onSuccess: () => {
@@ -73,7 +70,6 @@ export function ItemsAdmin() {
     setEditing(item);
     setName(item === "new" ? "" : item.name);
     setUnit(item === "new" ? "kg" : item.default_unit);
-    setEmoji(item === "new" ? "" : (item.emoji ?? ""));
   }
 
   if (isLoading) return <SkeletonList />;
@@ -83,7 +79,6 @@ export function ItemsAdmin() {
       <div className="space-y-2">
         {(items ?? []).map((item) => (
           <Card key={item.id} className="flex items-center gap-3">
-            <span className="text-xl">{item.emoji ?? "🥬"}</span>
             <div className="flex-1">
               <div className="font-semibold">
                 {item.name}{" "}
@@ -131,25 +126,20 @@ export function ItemsAdmin() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <Select
-              label={t.newItemUnit}
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-            >
-              {UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </Select>
-            <Input
-              label="Emoji"
-              maxLength={8}
-              value={emoji}
-              onChange={(e) => setEmoji(e.target.value)}
-            />
-          </div>
+          {/* The unit belongs to the item, not to each request line — it is
+              set once here and every list then shows just a name and a
+              number. No icon field: the catalogue is text-only. */}
+          <Select
+            label={t.newItemUnit}
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+          >
+            {UNITS.map((u) => (
+              <option key={u} value={u}>
+                {t.units[u]}
+              </option>
+            ))}
+          </Select>
           {editing !== "new" && editing !== null && (
             <Button
               variant="secondary"

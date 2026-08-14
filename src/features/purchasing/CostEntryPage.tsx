@@ -138,12 +138,11 @@ export default function CostEntryPage() {
           {groups.map((group) => (
             <Card key={group.key}>
               <div className="flex items-center gap-3">
-                <span className="text-xl">{group.emoji ?? "🥬"}</span>
                 <div className="flex-1">
                   <div className="font-semibold">{group.name}</div>
                   <div className="text-xs text-gray-400">
-                    {fmtQty(group.totalQty, group.unit)} ·{" "}
-                    {group.lines.length} {t.stores.toLowerCase()}
+                    {fmtQty(group.totalQty)} · {group.lines.length}{" "}
+                    {t.stores.toLowerCase()}
                   </div>
                 </div>
                 <label className="block w-28">
@@ -189,7 +188,7 @@ export default function CostEntryPage() {
                       <span className="flex-1 text-gray-600">
                         {line.storeName}
                         <span className="ms-2 text-xs text-gray-400">
-                          ({fmtQty(line.requested_qty, line.unit)})
+                          ({fmtQty(line.requested_qty)})
                         </span>
                       </span>
                       <input

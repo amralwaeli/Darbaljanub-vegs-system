@@ -46,6 +46,8 @@ export const en = {
     COMPLETED: "Completed",
   } as Record<string, string>,
   noActiveCycle: "No active order cycle",
+  readyToOrder:
+    "Adjust any quantity above, then open the WhatsApp tab to send the order to your vendors. Sending closes this cycle and opens the next one.",
   noOrderYet:
     "No order has been sent to the market yet. Review the store requests on the home screen and lock them to start one.",
   startCycle: "Start today's cycle",
@@ -69,6 +71,14 @@ export const en = {
   remove: "Remove",
   removeItemConfirm: "Remove this item from the request?",
   requestLocked: "The cycle is locked — your request can no longer be edited.",
+  sendRequest: "Send request to manager",
+  sendRequestConfirm:
+    "Send this list to the manager? You will not be able to change it afterwards — the manager can adjust quantities if needed.",
+  requestSent: "Request sent to the manager",
+  requestSentNote:
+    "This request has been sent. Only the manager can change the quantities now.",
+  requestDraftBadge: "Draft",
+  requestSentBadge: "Sent",
   requestEmpty: "No items yet. Add what your store needs.",
   requestNewItem: "Request new item",
   newItemName: "Item name",
@@ -153,6 +163,20 @@ export const en = {
   notes: "Notes",
   addCatalogItem: "Add item",
   emojiLabel: "Emoji",
+  // WhatsApp order message sent to market vendors
+  waOrderTitle: "Order",
+  waTo: "To",
+  waLineCount: "Total lines",
+  waFooter: "Please confirm availability. Thank you!",
+  // Keyed by the values in UNITS (lib/types.ts).
+  units: {
+    kg: "kg",
+    box: "box",
+    bag: "bag",
+    piece: "piece",
+    bunch: "bunch",
+    carton: "carton",
+  } as Record<string, string>,
   approve: "Approve",
   pendingApproval: "Pending approval",
   inviteUser: "Invite user",
@@ -192,6 +216,10 @@ export const en = {
   notificationsOff: "Notifications disabled",
   notificationsDenied:
     "Notifications are blocked — allow them in your browser/app settings",
+  notificationsWhy:
+    "Get alerted on this device for the steps that concern your role — new store requests, prices, loads and deliveries.",
+  notificationsEnableNow: "Turn on",
+  notificationsLater: "Later",
 
   // generic
   loading: "Loading…",
