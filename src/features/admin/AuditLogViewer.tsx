@@ -38,7 +38,7 @@ export function AuditLogViewer() {
         {(entries ?? []).map((entry) => (
           <Card key={entry.id}>
             <button
-              className="w-full text-left"
+              className="w-full text-start"
               onClick={() => setDetail(entry)}
             >
               <div className="flex items-center justify-between gap-2">
@@ -73,7 +73,9 @@ export function AuditLogViewer() {
             </div>
             {detail.old_data !== null && (
               <div>
-                <div className="mb-1 font-semibold text-gray-500">Before</div>
+                <div className="mb-1 font-semibold text-gray-500">
+                  {t.auditBefore}
+                </div>
                 <pre className="max-h-40 overflow-auto rounded-lg bg-red-50 p-2">
                   {JSON.stringify(detail.old_data, null, 2)}
                 </pre>
@@ -81,7 +83,9 @@ export function AuditLogViewer() {
             )}
             {detail.new_data !== null && (
               <div>
-                <div className="mb-1 font-semibold text-gray-500">After</div>
+                <div className="mb-1 font-semibold text-gray-500">
+                  {t.auditAfter}
+                </div>
                 <pre className="max-h-40 overflow-auto rounded-lg bg-green-50 p-2">
                   {JSON.stringify(detail.new_data, null, 2)}
                 </pre>

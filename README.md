@@ -17,6 +17,17 @@ silently on every deploy, no reinstalls ever**.
 Stack: React + Vite + TypeScript + Tailwind · TanStack Query · Supabase
 (Postgres/Auth/Storage/Realtime/Edge Functions, free tier) · vite-plugin-pwa.
 
+**Language**: the app is **Arabic-first (RTL)** — Arabic is the default for
+every user; a 🌐 toggle in the header/login switches to English. All text
+lives in `src/i18n/ar.ts` + `src/i18n/en.ts`; the two files are type-locked
+to the same shape, so a missing translation is a compile error.
+
+**Notifications**: real Web Push (works with the app closed, on installed
+Android/iOS PWAs and desktop) for three events — a PIC submits a request
+(→ managers), a driver marks Loaded (→ managers + that store's PIC), and
+costs become ready (→ all PICs). Fired by database triggers, so they cannot
+be skipped by a client. Setup in §5b.
+
 ---
 
 ## 1. Project structure
@@ -46,7 +57,7 @@ docs/
 
 1. **Create a project** at [supabase.com](https://supabase.com) (free tier).
 2. **Run migrations**: SQL Editor → paste & run each file from
-   `supabase/migrations/` **in numeric order** (0001 → 0007). Each runs clean
+   `supabase/migrations/` **in numeric order** (0001 → 0008). Each runs clean
    on a fresh project.
 3. **Auth settings** (Authentication → Sign In / Providers):
    - Email provider: enabled.
@@ -140,6 +151,41 @@ the full header-based CSP + HSTS on top of the meta tag.
 "Install app" → confirm. The 🥬 icon appears like a normal app.
 **iPhone (Safari)**: open the site → Share □↑ → **"Add to Home Screen"**.
 **Desktop (Chrome/Edge)**: install icon at the right of the address bar.
+
+## 5b. Push notifications setup (one-time, ~5 minutes)
+
+Pushes are sent by the `send-push` Edge Function, triggered directly by the
+database (pg_net) on: request submitted / delivery loaded / costs ready.
+
+1. **Generate VAPID keys** (once, anywhere):
+   ```sh
+   npx web-push generate-vapid-keys
+   ```
+2. **Function secrets** (invent a long random string for the webhook secret):
+   ```sh
+   npx supabase secrets set VAPID_PUBLIC_KEY=<public key> VAPID_PRIVATE_KEY=<private key> VAPID_SUBJECT=mailto:you@example.com PUSH_WEBHOOK_SECRET=<long random string>
+   npx supabase functions deploy send-push --no-verify-jwt
+   ```
+3. **Tell the database where to call** (SQL editor):
+   ```sql
+   update public.app_config set value = 'https://<ref>.supabase.co' where key = 'edge_base_url';
+   update public.app_config set value = '<same long random string>' where key = 'push_webhook_secret';
+   ```
+4. **Frontend key**: add the **public** VAPID key as
+   - GitHub secret `VITE_VAPID_PUBLIC_KEY` (for deploys), and
+   - `VITE_VAPID_PUBLIC_KEY=` in local `.env`.
+5. Each user taps the **🔕 bell** in the app header once and allows
+   notifications — per device.
+
+Notes:
+- **iPhone**: Web Push works only for the **installed** PWA (Add to Home
+  Screen, iOS 16.4+), not in the Safari tab.
+- Notification texts are Arabic (see `supabase/functions/send-push/index.ts`).
+- Verify end-to-end: submit a request as a PIC → the manager's phone should
+  get "🛒 طلب جديد". If nothing arrives, check the function logs (Dashboard →
+  Edge Functions → send-push → Logs) — the `web-push` npm package is expected
+  to run on the current Deno edge runtime, and any incompatibility would
+  surface there as an encryption/crypto error.
 
 ## 6. Security model
 

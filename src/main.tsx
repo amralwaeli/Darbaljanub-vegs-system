@@ -6,7 +6,12 @@ import App from "./App";
 import { queryClient } from "./lib/queryClient";
 import { ToastProvider } from "./components/Toast";
 import { initOfflineQueue } from "./lib/offlineQueue";
+import { LANG, IS_RTL } from "./i18n/strings";
 import "./index.css";
+
+// Arabic (default) renders right-to-left across the whole app.
+document.documentElement.lang = LANG;
+document.documentElement.dir = IS_RTL ? "rtl" : "ltr";
 
 // ---------------------------------------------------------------------------
 // Auto-update: registerType "autoUpdate" swaps in new service workers

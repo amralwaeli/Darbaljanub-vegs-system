@@ -139,7 +139,7 @@ export default function VendorOrdersPage() {
                 <button
                   key={key}
                   onClick={() => toggle(key)}
-                  className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 bg-white p-3 text-left transition-colors ${
+                  className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 bg-white p-3 text-start transition-colors ${
                     checked ? "border-brand-600 bg-brand-50" : "border-transparent shadow-sm ring-1 ring-black/5"
                   }`}
                 >

@@ -21,7 +21,7 @@ import { useToast } from "../../components/Toast";
 import { ApiError } from "../../lib/api/helpers";
 import { fmtTime } from "../../lib/format";
 import { t } from "../../i18n/strings";
-import { ROLE_LABELS, type ProfileWithStore } from "../../lib/types";
+import type { ProfileWithStore } from "../../lib/types";
 import type { UserRole } from "../../lib/database.types";
 
 export function UsersAdmin() {
@@ -115,7 +115,7 @@ export function UsersAdmin() {
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <div className="font-semibold">
-                  {user.username ?? "(no name yet)"}{" "}
+                  {user.username ?? t.noNameYet}{" "}
                   <Badge
                     color={
                       user.role === "superadmin"
@@ -127,7 +127,7 @@ export function UsersAdmin() {
                             : "amber"
                     }
                   >
-                    {ROLE_LABELS[user.role]}
+                    {t.roles[user.role]}
                   </Badge>{" "}
                   {!user.is_active && <Badge color="red">{t.inactive}</Badge>}
                 </div>
@@ -198,11 +198,11 @@ export function UsersAdmin() {
             value={role}
             onChange={(e) => setRole(e.target.value as UserRole)}
           >
-            <option value="pic">{ROLE_LABELS.pic}</option>
-            <option value="driver">{ROLE_LABELS.driver}</option>
-            <option value="manager">{ROLE_LABELS.manager}</option>
+            <option value="pic">{t.roles.pic}</option>
+            <option value="driver">{t.roles.driver}</option>
+            <option value="manager">{t.roles.manager}</option>
             {isSuperadmin && (
-              <option value="superadmin">{ROLE_LABELS.superadmin}</option>
+              <option value="superadmin">{t.roles.superadmin}</option>
             )}
           </Select>
           {role === "pic" && (

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { loginWithPin } from "../../lib/api/auth";
 import { ApiError } from "../../lib/api/helpers";
 import { Button, Input } from "../../components/ui";
-import { t } from "../../i18n/strings";
+import { t, toggleLanguage } from "../../i18n/strings";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -31,6 +31,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-brand-50 p-6">
+      <button
+        onClick={toggleLanguage}
+        className="absolute top-4 end-4 min-h-10 rounded-xl px-3 text-sm font-semibold text-brand-700 active:bg-brand-100"
+      >
+        🌐 {t.switchLang}
+      </button>
       <div className="mb-8 text-center">
         <div className="mb-2 text-6xl">🥬</div>
         <h1 className="text-2xl font-bold text-brand-800">{t.appName}</h1>

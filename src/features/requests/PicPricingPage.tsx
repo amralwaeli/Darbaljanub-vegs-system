@@ -153,7 +153,7 @@ export default function PicPricingPage() {
                       min="0"
                       step="0.05"
                       defaultValue={line.selling_price ?? ""}
-                      className="min-h-10 w-full rounded-lg border border-gray-300 px-2 text-right font-semibold"
+                      className="min-h-10 w-full rounded-lg border border-gray-300 px-2 text-end font-semibold"
                       onBlur={(e) => {
                         const value = Number(e.target.value);
                         if (

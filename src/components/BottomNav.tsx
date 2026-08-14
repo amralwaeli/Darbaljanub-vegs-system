@@ -16,14 +16,14 @@ const TABS: Record<string, Tab[]> = {
   driver: [{ to: "/", label: t.navDeliveries, icon: "🚚" }],
   manager: [
     { to: "/", label: t.navOrders, icon: "📋" },
-    { to: "/vendor-orders", label: "WhatsApp", icon: "🛒" },
+    { to: "/vendor-orders", label: t.navWhatsApp, icon: "🛒" },
     { to: "/purchase", label: t.navPurchase, icon: "💰" },
     { to: "/deliveries", label: t.navDeliveries, icon: "🚚" },
     { to: "/admin", label: t.navAdmin, icon: "⚙️" },
   ],
   superadmin: [
     { to: "/", label: t.navOrders, icon: "📋" },
-    { to: "/vendor-orders", label: "WhatsApp", icon: "🛒" },
+    { to: "/vendor-orders", label: t.navWhatsApp, icon: "🛒" },
     { to: "/purchase", label: t.navPurchase, icon: "💰" },
     { to: "/deliveries", label: t.navDeliveries, icon: "🚚" },
     { to: "/admin", label: t.navAdmin, icon: "⚙️" },

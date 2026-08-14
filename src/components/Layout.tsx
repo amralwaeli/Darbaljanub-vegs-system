@@ -2,11 +2,18 @@ import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
 import { Badge } from "./ui";
+import { useToast } from "./Toast";
 import { useAuth } from "../features/auth/AuthProvider";
 import { useCurrentCycle } from "../features/cycles/useCycle";
 import { useRealtimeInvalidate } from "../hooks/useRealtime";
 import { cycleKeys } from "../features/cycles/useCycle";
-import { t } from "../i18n/strings";
+import {
+  disablePush,
+  enablePush,
+  isPushEnabled,
+  pushSupported,
+} from "../lib/push";
+import { t, toggleLanguage } from "../i18n/strings";
 import type { CycleStatus } from "../lib/database.types";
 
 const STATUS_COLOR: Record<CycleStatus, "gray" | "green" | "amber" | "blue"> = {
@@ -16,6 +23,55 @@ const STATUS_COLOR: Record<CycleStatus, "gray" | "green" | "amber" | "blue"> = {
   IN_DELIVERY: "blue",
   COMPLETED: "gray",
 };
+
+/** 🔔 bell: enable/disable Web Push for this device. Hidden if unsupported. */
+function NotificationBell() {
+  const { profile } = useAuth();
+  const toast = useToast();
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void isPushEnabled().then(setEnabled);
+  }, []);
+
+  if (!pushSupported() || !profile) return null;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      if (enabled) {
+        await disablePush();
+        setEnabled(false);
+        toast.success(t.notificationsOff);
+      } else {
+        const result = await enablePush(profile!.id);
+        if (result === "denied") {
+          toast.error(t.notificationsDenied);
+        } else {
+          setEnabled(true);
+          toast.success(t.notificationsOn);
+        }
+      }
+    } catch {
+      toast.error(t.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={() => void toggle()}
+      disabled={busy}
+      className="flex h-10 w-10 items-center justify-center rounded-full text-lg active:bg-gray-100 disabled:opacity-50"
+      aria-label={t.enableNotifications}
+      title={enabled ? t.notificationsOn : t.enableNotifications}
+    >
+      {enabled ? "🔔" : "🔕"}
+    </button>
+  );
+}
 
 function useOnline() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -55,12 +111,20 @@ export function Layout() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {cycle && cycle.status !== "COMPLETED" && (
               <Badge color={STATUS_COLOR[cycle.status]}>
                 {t.cycleStatus[cycle.status]}
               </Badge>
             )}
+            <NotificationBell />
+            <button
+              onClick={toggleLanguage}
+              className="flex h-10 min-w-10 items-center justify-center rounded-full px-1 text-xs font-bold text-gray-500 active:bg-gray-100"
+              title={t.switchLang}
+            >
+              {t.switchLang}
+            </button>
             <button
               onClick={() => void signOut()}
               className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 active:bg-gray-100"

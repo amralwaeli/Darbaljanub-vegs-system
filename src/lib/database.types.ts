@@ -323,6 +323,34 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+        };
+        Update: {
+          p256dh?: string;
+          auth?: string;
+        };
+        Relationships: [];
+      };
+      app_config: {
+        Row: { key: string; value: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       driver_delivery_items: {

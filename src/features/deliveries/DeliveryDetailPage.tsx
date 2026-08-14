@@ -129,9 +129,9 @@ export default function DeliveryDetailPage() {
       {/* Explicit back button — installed iOS PWAs have no system back */}
       <button
         onClick={() => navigate(-1)}
-        className="mb-2 flex min-h-10 items-center gap-1 rounded-xl pr-3 font-semibold text-brand-700 active:bg-brand-50"
+        className="mb-2 flex min-h-10 items-center gap-1 rounded-xl pe-3 font-semibold text-brand-700 active:bg-brand-50"
       >
-        ← {t.deliveriesTitle}
+        {t.back}
       </button>
       <PageTitle
         right={

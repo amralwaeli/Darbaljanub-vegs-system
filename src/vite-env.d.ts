@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY: string;
   readonly VITE_CURRENCY?: string;
   readonly VITE_INACTIVITY_HOURS?: string;
+  readonly VITE_VAPID_PUBLIC_KEY?: string;
 }
 
 interface ImportMeta {

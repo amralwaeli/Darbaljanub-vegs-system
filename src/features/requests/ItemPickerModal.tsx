@@ -180,7 +180,7 @@ export function ItemPickerModal({
               {filtered.map((item) => (
                 <li key={item.id}>
                   <button
-                    className="flex min-h-12 w-full items-center gap-3 px-1 py-2 text-left active:bg-brand-50"
+                    className="flex min-h-12 w-full items-center gap-3 px-1 py-2 text-start active:bg-brand-50"
                     onClick={() => selectItem(item)}
                   >
                     <span className="text-xl">{item.emoji ?? "🥬"}</span>

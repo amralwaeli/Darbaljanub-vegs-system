@@ -154,7 +154,7 @@ export default function CostEntryPage() {
                     min="0"
                     step="0.05"
                     defaultValue={group.unitCost ?? ""}
-                    className="min-h-11 w-full rounded-lg border border-gray-300 px-2 text-right font-semibold"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 px-2 text-end font-semibold"
                     onBlur={(e) => {
                       const value = Number(e.target.value);
                       if (
@@ -188,7 +188,7 @@ export default function CostEntryPage() {
                     >
                       <span className="flex-1 text-gray-600">
                         {line.storeName}
-                        <span className="ml-2 text-xs text-gray-400">
+                        <span className="ms-2 text-xs text-gray-400">
                           ({fmtQty(line.requested_qty, line.unit)})
                         </span>
                       </span>
@@ -198,7 +198,7 @@ export default function CostEntryPage() {
                         min="0"
                         step="0.1"
                         defaultValue={line.purchased_qty ?? line.requested_qty}
-                        className="min-h-10 w-24 rounded-lg border border-gray-300 px-2 text-right"
+                        className="min-h-10 w-24 rounded-lg border border-gray-300 px-2 text-end"
                         onBlur={(e) => {
                           const value = Number(e.target.value);
                           if (
@@ -211,7 +211,7 @@ export default function CostEntryPage() {
                           }
                         }}
                       />
-                      <span className="w-20 text-right text-xs text-gray-500">
+                      <span className="w-20 text-end text-xs text-gray-500">
                         {fmtMoney(line.line_total)}
                       </span>
                     </li>

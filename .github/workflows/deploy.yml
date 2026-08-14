@@ -58,6 +58,7 @@ jobs:
           BASE_PATH: ${{ steps.base.outputs.path }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
           VITE_CURRENCY: ${{ vars.VITE_CURRENCY }}
           VITE_INACTIVITY_HOURS: ${{ vars.VITE_INACTIVITY_HOURS }}
 

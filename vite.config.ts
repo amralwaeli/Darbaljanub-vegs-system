@@ -21,6 +21,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // injectManifest: we ship our own service worker (src/sw.ts) so it can
+      // handle Web Push on top of the same precache/auto-update behavior.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icons/*.png"],
       manifest: {
@@ -54,12 +59,8 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        navigateFallback: `${base}index.html`,
-        cleanupOutdatedCaches: true,
-        // Never intercept Supabase calls with the SW cache.
-        navigateFallbackDenylist: [/^\/functions\//],
       },
     }),
   ],

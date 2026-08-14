@@ -1,7 +1,7 @@
 // Domain-level composed types for embedded (joined) query results.
 // Used with .returns<T>() on Supabase queries that embed related rows.
 
-import type { Tables, UserRole } from "./database.types";
+import type { Tables } from "./database.types";
 
 export type Profile = Tables<"profiles">;
 export type Store = Tables<"stores">;
@@ -49,11 +49,6 @@ export interface AggregatedItem {
   perStore: { store_id: string; store_name: string; qty: number }[];
 }
 
-export const ROLE_LABELS: Record<UserRole, string> = {
-  superadmin: "Super Admin",
-  manager: "Manager",
-  pic: "Store PIC",
-  driver: "Driver",
-};
+// Role display labels live in i18n (t.roles) — translated like everything else.
 
 export const UNITS = ["kg", "box", "bag", "piece", "bunch", "carton"] as const;
