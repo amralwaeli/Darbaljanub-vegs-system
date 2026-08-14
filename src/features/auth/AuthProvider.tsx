@@ -11,7 +11,9 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import type { Profile } from "../../lib/types";
 
-const INACTIVITY_HOURS = Number(import.meta.env.VITE_INACTIVITY_HOURS ?? "12");
+// 720h = 30 days of NO use before auto-logout. Any tap resets the timer, so
+// staff using the app daily stay logged in forever ("always connected").
+const INACTIVITY_HOURS = Number(import.meta.env.VITE_INACTIVITY_HOURS ?? "720");
 const INACTIVITY_MS = INACTIVITY_HOURS * 3600_000;
 const ACTIVITY_KEY = "vegs.lastActivity";
 

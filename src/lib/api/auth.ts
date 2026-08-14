@@ -20,7 +20,9 @@ export async function loginWithPin(email: string, pin: string): Promise<void> {
       body: JSON.stringify({ email, pin }),
     });
   } catch (e) {
-    throw new ApiError(t.offline, e);
+    // fetch threw: either the device is truly offline, or the login service
+    // is unreachable (e.g. Edge Function not deployed) — tell them apart.
+    throw new ApiError(navigator.onLine ? t.serviceUnavailable : t.offline, e);
   }
 
   const body = (await res.json().catch(() => ({}))) as {

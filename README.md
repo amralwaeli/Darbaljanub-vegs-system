@@ -225,7 +225,8 @@ Notes:
 - `is_active` is required by **every** RLS policy — deactivating a user cuts
   all access on their next request; the Edge Function also bans the auth user
   so token refresh dies too.
-- Inactivity auto-logout (default 12 h, `VITE_INACTIVITY_HOURS`).
+- Inactivity auto-logout (default 30 days of no use, `VITE_INACTIVITY_HOURS` —
+  daily users stay logged in indefinitely; lower it for stricter security).
 - PIN reset = superadmin/manager-triggered recovery email (re-invite flow).
 
 **Driver price isolation** — drivers have *no RLS policy at all* on

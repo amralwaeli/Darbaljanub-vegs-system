@@ -192,6 +192,7 @@ export const en = {
   // generic
   loading: "Loading…",
   offline: "You are offline — changes will sync when back online",
+  serviceUnavailable: "Cannot reach the server — please try again shortly",
   errorGeneric: "Something went wrong. Please try again.",
   retry: "Retry",
   confirm: "Confirm",

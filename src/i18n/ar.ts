@@ -191,6 +191,7 @@ export const ar: Strings = {
   // generic
   loading: "جارٍ التحميل…",
   offline: "أنت غير متصل — ستتم المزامنة عند عودة الاتصال",
+  serviceUnavailable: "تعذر الوصول إلى الخادم — حاول مرة أخرى بعد قليل",
   errorGeneric: "حدث خطأ ما. حاول مجدداً.",
   retry: "إعادة المحاولة",
   confirm: "تأكيد",
