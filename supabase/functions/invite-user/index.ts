@@ -18,9 +18,14 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 
+// Injected automatically; new-format key names first, legacy as fallback.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_KEY =
+  Deno.env.get("SUPABASE_SECRET_KEY") ??
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY =
+  Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ??
+  Deno.env.get("SUPABASE_ANON_KEY")!;
 // Where invite/recovery emails land. Set secret APP_URL to your deployed origin.
 const APP_URL = Deno.env.get("APP_URL") ?? "http://localhost:5173";
 

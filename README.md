@@ -91,6 +91,19 @@ docs/
    `pic-a@demo.local`/`333333`, `pic-b@demo.local`/`444444`,
    `driver@demo.local`/`555555`. **Delete or re-PIN these before real use.**
 
+### New vs legacy Supabase API keys
+
+Newer Supabase projects show `sb_publishable_...` and `sb_secret_...` keys
+instead of the legacy "anon" / "service_role" JWTs. Mapping:
+
+- `sb_publishable_...` → use anywhere this doc says **anon key**
+  (`VITE_SUPABASE_ANON_KEY`) — safe for browsers, RLS applies.
+- `sb_secret_...` → use anywhere this doc says **service-role key**
+  (`SUPABASE_SERVICE_ROLE_KEY` for the seed script) — server/local only,
+  bypasses RLS, never in the frontend or GitHub secrets.
+
+The Edge Functions accept both generations of injected key names.
+
 ## 3. Local development
 
 ```sh

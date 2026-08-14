@@ -20,9 +20,16 @@
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 
+// Supabase injects these automatically. Newer projects use the new key
+// names (SUPABASE_SECRET_KEY / SUPABASE_PUBLISHABLE_KEY); older ones the
+// legacy names — accept either.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_KEY =
+  Deno.env.get("SUPABASE_SECRET_KEY") ??
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY =
+  Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ??
+  Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const MAX_FAILS = 5;
 const WINDOW_MINUTES = 15;
