@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "../auth/AuthProvider";
 import {
-  useCurrentCycle,
-  useCreateCycle,
+  useOpenCycle,
+  useWorkingCycle,
   useSetCycleStatus,
   cycleKeys,
 } from "../cycles/useCycle";
@@ -27,28 +26,29 @@ export const allRequestsKey = (cycleId: string) =>
   ["requests", "all", cycleId] as const;
 
 export default function ManagerDashboard() {
-  const { session } = useAuth();
   const toast = useToast();
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
-  const createCycle = useCreateCycle(session?.user.id);
+  // Branches file into the OPEN cycle, which always exists. The working cycle
+  // is the order already sent to the market, if one is still out.
+  const { data: cycle, isLoading: cycleLoading } = useOpenCycle();
+  const { data: working } = useWorkingCycle();
   const setStatus = useSetCycleStatus();
   const [tab, setTab] = useState<"stores" | "aggregated">("stores");
-  const [confirm, setConfirm] = useState<"start" | "lock" | null>(null);
+  const [confirm, setConfirm] = useState<"lock" | null>(null);
 
   const cycleId = cycle?.id ?? "";
-  const active = cycle && cycle.status !== "COMPLETED";
+  const orderInFlight = Boolean(working && working.status !== "COMPLETED");
 
   const { data: requests, isLoading } = useQuery({
     queryKey: allRequestsKey(cycleId),
     queryFn: () => fetchAllRequests(cycleId),
-    enabled: Boolean(cycleId && active),
+    enabled: Boolean(cycleId),
   });
 
   // New PIC submissions appear live.
   useRealtimeInvalidate(
     "manager-requests",
     ["store_requests", "request_items"],
-    [allRequestsKey(cycleId), cycleKeys.current],
+    [allRequestsKey(cycleId), cycleKeys.all],
   );
 
   const onApiError = (e: unknown) =>
@@ -56,31 +56,11 @@ export default function ManagerDashboard() {
 
   if (cycleLoading) return <SkeletonList />;
 
-  if (!active) {
+  if (!cycle) {
     return (
       <>
         <PageTitle>{t.requestsTitle}</PageTitle>
         <EmptyState emoji="🌅" message={t.noActiveCycle} />
-        <Button
-          className="w-full"
-          busy={createCycle.isPending}
-          onClick={() => setConfirm("start")}
-        >
-          {t.startCycle}
-        </Button>
-        <ConfirmDialog
-          open={confirm === "start"}
-          title={t.startCycle}
-          message={t.startCycleConfirm}
-          busy={createCycle.isPending}
-          onCancel={() => setConfirm(null)}
-          onConfirm={() =>
-            createCycle.mutate(undefined, {
-              onSuccess: () => setConfirm(null),
-              onError: onApiError,
-            })
-          }
-        />
       </>
     );
   }
@@ -161,7 +141,13 @@ export default function ManagerDashboard() {
         </div>
       )}
 
-      {cycle.status === "OPEN" && (requests ?? []).length > 0 && (
+      {orderInFlight && (
+        <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t.orderInFlight}
+        </p>
+      )}
+
+      {(requests ?? []).length > 0 && !orderInFlight && (
         <Button className="mt-4 w-full" onClick={() => setConfirm("lock")}>
           🔒 {t.lockCycle}
         </Button>

@@ -5,10 +5,14 @@ dev-dist
 SETUP_ALL_MIGRATIONS.sql
 RESET_DATABASE.sql
 
-# Android TWA wrapper: only the manifest is tracked; keystore + generated
-# project + build outputs never leave this machine
+# Android TWA wrapper: keystore + generated project + build outputs never
+# leave this machine. The manifest and the Digital Asset Links files hold no
+# secrets (a cert fingerprint is public by design) and are tracked.
 twa/*
 !twa/twa-manifest.json
+!twa/assetlinks.json
+!twa/pages-root/
+!twa/pages-root/**
 .env
 .env.local
 *.local

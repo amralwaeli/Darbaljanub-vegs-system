@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
-import { useCurrentCycle, cycleKeys } from "../cycles/useCycle";
+import { useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import { fetchStoreRequest, updateRequestItem } from "../../lib/api/requests";
 import {
@@ -31,7 +31,7 @@ export default function PicPricingPage() {
   const { profile } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
+  const { data: cycle, isLoading: cycleLoading } = useWorkingCycle();
   const [confirmReceive, setConfirmReceive] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
@@ -56,7 +56,7 @@ export default function PicPricingPage() {
   useRealtimeInvalidate(
     "pic-prices",
     ["request_items", "deliveries"],
-    [priceKey(cycleId, storeId), deliveryKey(cycleId), cycleKeys.current],
+    [priceKey(cycleId, storeId), deliveryKey(cycleId), cycleKeys.all],
   );
 
   const onApiError = (e: unknown) =>

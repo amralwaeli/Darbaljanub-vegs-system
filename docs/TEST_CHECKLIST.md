@@ -10,8 +10,9 @@ realtime updates land.
 
 ### 1. Manager — start the day
 - [ ] Log in as `manager@demo.local` / `222222`.
-- [ ] Home shows "No active order cycle" → tap **Start today's cycle** → confirm.
-- [ ] Header badge shows **Open for requests**.
+- [ ] Home shows the request list straight away — there is **no** "Start
+      today's cycle" step; an OPEN cycle always exists.
+- [ ] Header badge is empty (it tracks the order in flight, and none is out).
 
 ### 2. PIC — submit requests
 - [ ] Log in as `pic-a@demo.local` / `333333` (second device/browser).
@@ -29,8 +30,11 @@ realtime updates land.
 - [ ] Dashboard **Per store**: Store A and Store B cards with correct lines.
 - [ ] **Aggregated**: Tomato = 27 kg with "Store A: 12 · Store B: 15".
 - [ ] Tap **Lock & mark as Ordered** → confirm.
-- [ ] As PIC A: request now read-only ("cycle is locked" banner); editing is
-      also rejected server-side (see RLS section).
+- [ ] Header badge shows **Ordered**; the dashboard is back to an empty OPEN
+      list, and an amber banner explains the previous order is still out.
+- [ ] As PIC A: the request screen is a **fresh empty list** for the new OPEN
+      cycle, still editable. The locked lines stay visible under **Prices**.
+      Editing the locked cycle's lines is rejected server-side (see RLS).
 - [ ] **WhatsApp** tab → select Tomato + Cucumber → vendor "Abu Khalid
       Vegetables" → message preview shows `• Tomato — 27 kg` etc. →
       **Send via WhatsApp** → wa.me opens with the prefilled message; the
@@ -67,8 +71,22 @@ realtime updates land.
 ### 7. PIC — receive
 - [ ] As PIC A, Prices tab → delivery card shows **Loaded** + photo →
       **Confirm goods received** → status **Received**.
-- [ ] After PIC B confirms too, the cycle badge becomes **Completed** —
-      manager home offers to start a new cycle.
+- [ ] After PIC B confirms too, the header badge clears and the manager can
+      lock the next order — no "start a cycle" step, and the amber
+      "previous order still out" banner is gone.
+
+### 7b. Always-open cycle & notifications
+- [ ] While the order above is still ORDERED/PURCHASED/IN_DELIVERY, add an
+      item as PIC A. It saves — a branch is never blocked by an order in
+      flight. (This is what migration 0009 fixed.)
+- [ ] The manager's **Lock** button is hidden while that order is out; the
+      amber banner explains why.
+- [ ] Push: with notifications enabled on the manager's device, the first item
+      a branch adds fires "🛒 طلب جديد — أرسل <store> طلب اليوم". If nothing
+      arrives, `app_config.edge_base_url` / `push_webhook_secret` are unset —
+      see README (the trigger no-ops silently by design).
+- [ ] Never two open cycles:
+      `select count(*) from order_cycles where status = 'OPEN';` → always `1`.
 
 ### 8. Admin & security UX
 - [ ] Manager → Admin → Items: approve "Sweet Corn" → PIC picker now has it.

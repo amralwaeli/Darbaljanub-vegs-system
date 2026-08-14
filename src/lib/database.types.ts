@@ -380,6 +380,10 @@ export interface Database {
         Args: Record<string, never>;
         Returns: boolean;
       };
+      ensure_open_cycle: {
+        Args: Record<string, never>;
+        Returns: Database["public"]["Tables"]["order_cycles"]["Row"];
+      };
     };
     Enums: {
       user_role: UserRole;

@@ -7,7 +7,11 @@
 #        VITE_SUPABASE_URL       = https://<ref>.supabase.co
 #        VITE_SUPABASE_ANON_KEY  = <anon key>          (safe: RLS protects data)
 #      Optional "Variables":
-#        VITE_CURRENCY, VITE_INACTIVITY_HOURS
+#        VITE_CURRENCY
+#        VITE_INACTIVITY_HOURS — idle hours before auto-logout. Leave the
+#          variable UNSET to keep staff signed in until they tap Logout.
+#          An unset variable expands to "", which the client reads as
+#          "disabled" (it must never be parsed as the number 0).
 #
 # Every push to main = new deploy = every installed PWA silently auto-updates
 # within about a minute of being opened/focused.

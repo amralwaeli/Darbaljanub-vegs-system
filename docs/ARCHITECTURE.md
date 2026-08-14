@@ -43,16 +43,24 @@
 
 ## 2. Order-cycle state machine
 
+An OPEN cycle **always exists** (migration 0009): stores can file a request at
+any hour without waiting for a manager to start one. Locking it immediately
+creates its replacement, so the order being purchased and the next round of
+requests run side by side. Two partial unique indexes hold the invariant: at
+most one OPEN cycle, and at most one in-flight (ORDERED/PURCHASED/IN_DELIVERY)
+cycle.
+
 ```
-                   Manager creates cycle
+                   Always present; auto-created
                            │
                            ▼
                        ┌──────┐   PICs create/edit their store request
                        │ OPEN │   (request_items: item, qty, unit)
                        └──┬───┘   ← PIC edits allowed ONLY here (DB trigger enforced)
-    Manager locks &       │
-    generates vendor      ▼
-    WhatsApp orders   ┌─────────┐  vendor_orders + message snapshots saved
+    Manager locks &       │       first item filed → push to managers
+    generates vendor      │       leaving OPEN → a fresh OPEN cycle is created
+    WhatsApp orders       ▼
+                      ┌─────────┐  vendor_orders + message snapshots saved
                       │ ORDERED │  wa.me deep links opened per vendor
                       └──┬──────┘
     Manager enters        │

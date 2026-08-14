@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.darbaljanub.vegs",
+      "sha256_cert_fingerprints": [
+        "43:23:04:AA:99:0F:68:06:E3:20:27:85:AE:82:30:7C:17:2E:44:DB:54:70:6F:66:ED:EE:6C:74:50:E4:78:B1"
+      ]
+    }
+  }
+]

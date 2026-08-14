@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCurrentCycle, useSetCycleStatus, cycleKeys } from "../cycles/useCycle";
+import { useWorkingCycle, useSetCycleStatus, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import { fetchAllRequests, updateRequestItem } from "../../lib/api/requests";
 import { allRequestsKey } from "./ManagerDashboard";
@@ -33,7 +33,7 @@ interface CostGroup {
 export default function CostEntryPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
+  const { data: cycle, isLoading: cycleLoading } = useWorkingCycle();
   const setStatus = useSetCycleStatus();
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -50,7 +50,7 @@ export default function CostEntryPage() {
   useRealtimeInvalidate(
     "cost-entry",
     ["request_items"],
-    [allRequestsKey(cycleId), cycleKeys.current],
+    [allRequestsKey(cycleId), cycleKeys.all],
   );
 
   const groups = useMemo<CostGroup[]>(() => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useCurrentCycle, cycleKeys } from "../cycles/useCycle";
+import { useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import { fetchDeliveries, getPhotoUrl } from "../../lib/api/deliveries";
 import { deliveriesKey } from "./DriverHomePage";
@@ -22,7 +22,7 @@ import { t } from "../../i18n/strings";
 /** Manager/superadmin: live view of every store's loading status + photos. */
 export default function DeliveriesOverviewPage() {
   const toast = useToast();
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
+  const { data: cycle, isLoading: cycleLoading } = useWorkingCycle();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
 
@@ -39,7 +39,7 @@ export default function DeliveriesOverviewPage() {
   useRealtimeInvalidate(
     "manager-deliveries",
     ["deliveries", "delivery_item_checks"],
-    [deliveriesKey(cycleId), cycleKeys.current],
+    [deliveriesKey(cycleId), cycleKeys.all],
   );
 
   async function openPhoto(path: string) {

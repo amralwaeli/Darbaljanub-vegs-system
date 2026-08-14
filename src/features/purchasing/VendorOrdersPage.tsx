@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCurrentCycle } from "../cycles/useCycle";
+import { useWorkingCycle } from "../cycles/useCycle";
 import { aggregateRequests, fetchAllRequests } from "../../lib/api/requests";
 import {
   fetchVendorOrders,
@@ -29,7 +29,7 @@ const vendorOrdersKey = (cycleId: string) =>
 export default function VendorOrdersPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
+  const { data: cycle, isLoading: cycleLoading } = useWorkingCycle();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [vendorId, setVendorId] = useState("");
 
@@ -111,12 +111,7 @@ export default function VendorOrdersPage() {
     return (
       <>
         <PageTitle>{t.vendorOrdersTitle}</PageTitle>
-        <EmptyState
-          emoji="🛒"
-          message={
-            cycle?.status === "OPEN" ? t.lockCycleConfirm : t.noActiveCycle
-          }
-        />
+        <EmptyState emoji="🛒" message={t.noOrderYet} />
       </>
     );
   }

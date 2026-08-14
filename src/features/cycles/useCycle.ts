@@ -1,31 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  createCycle,
-  fetchCurrentCycle,
+  fetchOpenCycle,
+  fetchWorkingCycle,
   setCycleStatus,
 } from "../../lib/api/cycles";
 import type { CycleStatus } from "../../lib/database.types";
 
 export const cycleKeys = {
-  current: ["cycle", "current"] as const,
+  open: ["cycle", "open"] as const,
+  working: ["cycle", "working"] as const,
+  /** Prefix covering both — a status change moves a cycle between them. */
+  all: ["cycle"] as const,
 };
 
-export function useCurrentCycle() {
+/** The cycle branches file requests into. Always exists (see migration 0009). */
+export function useOpenCycle() {
   return useQuery({
-    queryKey: cycleKeys.current,
-    queryFn: fetchCurrentCycle,
+    queryKey: cycleKeys.open,
+    queryFn: fetchOpenCycle,
   });
 }
 
-export function useCreateCycle(userId: string | undefined) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => {
-      if (!userId) throw new Error("no user");
-      return createCycle(userId);
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: cycleKeys.current }),
+/** The order being purchased/delivered right now, if any. */
+export function useWorkingCycle() {
+  return useQuery({
+    queryKey: cycleKeys.working,
+    queryFn: fetchWorkingCycle,
   });
 }
 
@@ -34,7 +34,9 @@ export function useSetCycleStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: CycleStatus }) =>
       setCycleStatus(id, status),
+    // A status change moves the cycle between the open/working queries, so
+    // refresh both, not just the one this screen happened to read.
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: cycleKeys.current }),
+      queryClient.invalidateQueries({ queryKey: cycleKeys.all }),
   });
 }

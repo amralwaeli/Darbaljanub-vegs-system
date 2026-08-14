@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
-import { useCurrentCycle, cycleKeys } from "../cycles/useCycle";
+import { useOpenCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import {
   addRequestItem,
@@ -21,7 +21,6 @@ import {
   SkeletonList,
 } from "../../components/ui";
 import { useToast } from "../../components/Toast";
-import { fmtQty } from "../../lib/format";
 import { t } from "../../i18n/strings";
 import type { Item, RequestItemWithItem } from "../../lib/types";
 
@@ -32,7 +31,7 @@ export default function PicRequestPage() {
   const { session, profile } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
+  const { data: cycle, isLoading: cycleLoading } = useOpenCycle();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RequestItemWithItem | null>(
     null,
@@ -40,18 +39,17 @@ export default function PicRequestPage() {
 
   const storeId = profile?.store_id ?? "";
   const cycleId = cycle?.id ?? "";
-  const editable = cycle?.status === "OPEN";
 
   const { data: request, isLoading } = useQuery({
     queryKey: requestKey(cycleId, storeId),
     queryFn: () => fetchStoreRequest(cycleId, storeId),
-    enabled: Boolean(cycleId && storeId && cycle?.status !== "COMPLETED"),
+    enabled: Boolean(cycleId && storeId),
   });
 
   useRealtimeInvalidate(
     "pic-request",
     ["request_items", "store_requests"],
-    [requestKey(cycleId, storeId), cycleKeys.current],
+    [requestKey(cycleId, storeId), cycleKeys.all],
   );
 
   const invalidate = () =>
@@ -112,7 +110,9 @@ export default function PicRequestPage() {
 
   if (cycleLoading) return <SkeletonList />;
 
-  if (!cycle || cycle.status === "COMPLETED") {
+  // An OPEN cycle always exists (migration 0009) — only a failed fetch lands
+  // here, and the next launch retries.
+  if (!cycle) {
     return (
       <>
         <PageTitle>{t.myRequest}</PageTitle>
@@ -125,23 +125,9 @@ export default function PicRequestPage() {
 
   return (
     <>
-      <PageTitle
-        right={
-          editable ? (
-            <Badge color="green">{t.cycleStatus.OPEN}</Badge>
-          ) : (
-            <Badge color="amber">{t.cycleStatus[cycle.status]}</Badge>
-          )
-        }
-      >
+      <PageTitle right={<Badge color="green">{t.cycleStatus.OPEN}</Badge>}>
         {t.myRequest}
       </PageTitle>
-
-      {!editable && (
-        <p className="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {t.requestLocked}
-        </p>
-      )}
 
       {isLoading ? (
         <SkeletonList />
@@ -159,53 +145,43 @@ export default function PicRequestPage() {
                 <div className="font-semibold">{line.item.name}</div>
                 <div className="text-xs text-gray-400">{line.unit}</div>
               </div>
-              {editable ? (
-                <>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0.1"
-                    step="0.1"
-                    className="min-h-12 w-20 rounded-xl border border-gray-300 px-2 text-center font-semibold"
-                    defaultValue={line.requested_qty}
-                    onBlur={(e) => {
-                      const value = Number(e.target.value);
-                      if (
-                        Number.isFinite(value) &&
-                        value > 0 &&
-                        value !== Number(line.requested_qty)
-                      ) {
-                        qtyMutation.mutate({ id: line.id, qty: value });
-                      }
-                    }}
-                  />
-                  <button
-                    aria-label={t.remove}
-                    className="flex h-12 w-10 items-center justify-center rounded-xl text-red-400 active:bg-red-50"
-                    onClick={() => setRemoveTarget(line)}
-                  >
-                    🗑
-                  </button>
-                </>
-              ) : (
-                <span className="font-bold">
-                  {fmtQty(line.requested_qty, line.unit)}
-                </span>
-              )}
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0.1"
+                step="0.1"
+                className="min-h-12 w-20 rounded-xl border border-gray-300 px-2 text-center font-semibold"
+                defaultValue={line.requested_qty}
+                onBlur={(e) => {
+                  const value = Number(e.target.value);
+                  if (
+                    Number.isFinite(value) &&
+                    value > 0 &&
+                    value !== Number(line.requested_qty)
+                  ) {
+                    qtyMutation.mutate({ id: line.id, qty: value });
+                  }
+                }}
+              />
+              <button
+                aria-label={t.remove}
+                className="flex h-12 w-10 items-center justify-center rounded-xl text-red-400 active:bg-red-50"
+                onClick={() => setRemoveTarget(line)}
+              >
+                🗑
+              </button>
             </li>
           ))}
         </ul>
       )}
 
-      {editable && (
-        <Button
-          className="mt-4 w-full"
-          onClick={() => setPickerOpen(true)}
-          busy={addMutation.isPending && !pickerOpen}
-        >
-          ➕ {t.addItem}
-        </Button>
-      )}
+      <Button
+        className="mt-4 w-full"
+        onClick={() => setPickerOpen(true)}
+        busy={addMutation.isPending && !pickerOpen}
+      >
+        ➕ {t.addItem}
+      </Button>
 
       <ItemPickerModal
         open={pickerOpen}

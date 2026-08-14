@@ -46,6 +46,8 @@ export const en = {
     COMPLETED: "Completed",
   } as Record<string, string>,
   noActiveCycle: "No active order cycle",
+  noOrderYet:
+    "No order has been sent to the market yet. Review the store requests on the home screen and lock them to start one.",
   startCycle: "Start today's cycle",
   startCycleConfirm:
     "Start a new order cycle? Stores will be able to submit requests.",
@@ -73,7 +75,9 @@ export const en = {
   newItemUnit: "Default unit",
   newItemPending: "Sent to manager for approval",
   itemAdded: "Item added",
-  waitingForCycle: "No open cycle right now. The manager will start one soon.",
+  waitingForCycle: "Could not load the request list. Pull down to retry.",
+  orderInFlight:
+    "The previous order is still being delivered. New requests keep arriving here — you can send them to the market once it is finished.",
 
   // PIC pricing
   myPrices: "Cost & selling prices",

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useCurrentCycle, cycleKeys } from "../cycles/useCycle";
+import { useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import { fetchDeliveries } from "../../lib/api/deliveries";
 import {
@@ -26,7 +26,7 @@ const STATUS_BADGE: Record<
 };
 
 export default function DriverHomePage() {
-  const { data: cycle, isLoading: cycleLoading } = useCurrentCycle();
+  const { data: cycle, isLoading: cycleLoading } = useWorkingCycle();
   const cycleId = cycle?.id ?? "";
   const active =
     cycle && ["PURCHASED", "IN_DELIVERY"].includes(cycle.status);
@@ -40,7 +40,7 @@ export default function DriverHomePage() {
   useRealtimeInvalidate(
     "driver-deliveries",
     ["deliveries"],
-    [deliveriesKey(cycleId), cycleKeys.current],
+    [deliveriesKey(cycleId), cycleKeys.all],
   );
 
   if (cycleLoading || (active && isLoading)) return <SkeletonList />;

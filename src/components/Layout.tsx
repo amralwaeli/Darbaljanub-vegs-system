@@ -4,7 +4,7 @@ import { BottomNav } from "./BottomNav";
 import { Badge } from "./ui";
 import { useToast } from "./Toast";
 import { useAuth } from "../features/auth/AuthProvider";
-import { useCurrentCycle } from "../features/cycles/useCycle";
+import { useWorkingCycle } from "../features/cycles/useCycle";
 import { useRealtimeInvalidate } from "../hooks/useRealtime";
 import { cycleKeys } from "../features/cycles/useCycle";
 import {
@@ -90,11 +90,13 @@ function useOnline() {
 
 export function Layout() {
   const { profile, signOut } = useAuth();
-  const { data: cycle } = useCurrentCycle();
+  // The badge tracks the order in flight. The OPEN cycle is always open, so
+  // badging it would just show a permanent "OPEN" that tells nobody anything.
+  const { data: cycle } = useWorkingCycle();
   const online = useOnline();
 
   // Everyone stays in sync with cycle status changes, live.
-  useRealtimeInvalidate("layout-cycle", ["order_cycles"], [cycleKeys.current]);
+  useRealtimeInvalidate("layout-cycle", ["order_cycles"], [cycleKeys.all]);
 
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-20">
