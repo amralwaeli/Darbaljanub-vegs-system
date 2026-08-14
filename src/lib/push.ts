@@ -3,7 +3,14 @@
 
 import { supabase } from "./supabase";
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "";
+// The VAPID *public* key is safe to ship in code (it identifies our push
+// sender; the private half lives only in Supabase secrets). The env var can
+// override it if the key pair is ever rotated.
+const DEFAULT_VAPID_PUBLIC_KEY =
+  "BJXMSUrHF5RLOIlnWzMfEkg2zAJyCT4FJYyJzCHfbqep28hLXNX8nVMBfj3Bb5z3axteMu0cRr58rnRlVJmdQY8";
+
+const VAPID_PUBLIC_KEY =
+  import.meta.env.VITE_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
 
 export function pushSupported(): boolean {
   return (
