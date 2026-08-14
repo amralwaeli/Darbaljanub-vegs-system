@@ -1,0 +1,84 @@
+# ============================================================================
+# Deploy the PWA to GitHub Pages on every push to main.
+#
+# One-time setup in the GitHub repo:
+#   1. Settings → Pages → Source: "GitHub Actions"
+#   2. Settings → Secrets and variables → Actions → New repository secret:
+#        VITE_SUPABASE_URL       = https://<ref>.supabase.co
+#        VITE_SUPABASE_ANON_KEY  = <anon key>          (safe: RLS protects data)
+#      Optional "Variables":
+#        VITE_CURRENCY, VITE_INACTIVITY_HOURS
+#
+# Every push to main = new deploy = every installed PWA silently auto-updates
+# within about a minute of being opened/focused.
+# ============================================================================
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Project site (user.github.io/<repo>) needs base "/<repo>/";
+      # a user/org site (<user>.github.io repo) or custom domain needs "/".
+      - name: Compute base path
+        id: base
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          if [[ "$REPO" == *.github.io ]]; then
+            echo "path=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=/$REPO/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          BASE_PATH: ${{ steps.base.outputs.path }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CURRENCY: ${{ vars.VITE_CURRENCY }}
+          VITE_INACTIVITY_HOURS: ${{ vars.VITE_INACTIVITY_HOURS }}
+
+      # GitHub Pages has no SPA rewrites: serving a copy of index.html as
+      # 404.html makes deep links (/accept-invite, /delivery/<id>) load the
+      # app, which then routes client-side.
+      - name: SPA fallback
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

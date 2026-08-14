@@ -1,0 +1,11 @@
+# Supabase CLI config — only needed if you deploy Edge Functions via CLI.
+# `auth-login` must be public (callers are not authenticated yet); the
+# function does its own rate limiting. `invite-user` requires a valid JWT.
+
+project_id = "vegs-system"
+
+[functions.auth-login]
+verify_jwt = false
+
+[functions.invite-user]
+verify_jwt = true
