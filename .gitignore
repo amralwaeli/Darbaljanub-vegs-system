@@ -2,6 +2,13 @@ node_modules
 dist
 dev-dist
 *.tsbuildinfo
+SETUP_ALL_MIGRATIONS.sql
+RESET_DATABASE.sql
+
+# Android TWA wrapper: only the manifest is tracked; keystore + generated
+# project + build outputs never leave this machine
+twa/*
+!twa/twa-manifest.json
 .env
 .env.local
 *.local

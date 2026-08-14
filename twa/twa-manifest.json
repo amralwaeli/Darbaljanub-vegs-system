@@ -1,0 +1,42 @@
+{
+  "packageId": "com.darbaljanub.vegs",
+  "host": "amralwaeli.github.io",
+  "name": "خضار درب الجنوب",
+  "launcherName": "درب الجنوب",
+  "display": "standalone",
+  "themeColor": "#15803D",
+  "themeColorDark": "#15803D",
+  "navigationColor": "#15803D",
+  "navigationColorDark": "#15803D",
+  "navigationDividerColor": "#15803D",
+  "navigationDividerColorDark": "#15803D",
+  "backgroundColor": "#F0FDF4",
+  "enableNotifications": true,
+  "startUrl": "/Darbaljanub-vegs-system/",
+  "iconUrl": "https://raw.githubusercontent.com/amralwaeli/Darbaljanub-vegs-system/main/public/icons/icon-512.png",
+  "maskableIconUrl": "https://raw.githubusercontent.com/amralwaeli/Darbaljanub-vegs-system/main/public/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://amralwaeli.github.io/Darbaljanub-vegs-system/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://amralwaeli.github.io/Darbaljanub-vegs-system/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}
