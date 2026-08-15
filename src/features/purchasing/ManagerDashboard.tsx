@@ -3,17 +3,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOpenCycle, useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import {
+  addRequestItem,
   aggregateRequests,
   fetchAllRequests,
+  managerRequestForStore,
   updateRequestItem,
 } from "../../lib/api/requests";
+import { ItemPickerModal } from "../requests/ItemPickerModal";
 import {
   Badge,
+  Button,
   Card,
   EmptyState,
   PageTitle,
   SkeletonList,
 } from "../../components/ui";
+import type { Item } from "../../lib/types";
 import { useToast } from "../../components/Toast";
 import { ApiError } from "../../lib/api/helpers";
 import { fmtDate, fmtQty } from "../../lib/format";
@@ -30,6 +35,8 @@ export default function ManagerDashboard() {
   const { data: cycle, isLoading: cycleLoading } = useOpenCycle();
   const { data: working } = useWorkingCycle();
   const [tab, setTab] = useState<"stores" | "aggregated">("stores");
+  /** store_id whose request the manager is adding an item to, if any. */
+  const [addTarget, setAddTarget] = useState<string | null>(null);
 
   const cycleId = cycle?.id ?? "";
   const orderInFlight = Boolean(working && working.status !== "COMPLETED");
@@ -55,6 +62,33 @@ export default function ManagerDashboard() {
       updateRequestItem(id, { requested_qty: qty }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: allRequestsKey(cycleId) }),
+    onError: onApiError,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async ({
+      storeId,
+      item,
+      qty,
+    }: {
+      storeId: string;
+      item: Item;
+      qty: number;
+    }) => {
+      // Returns the existing request, or creates one if the store never sent.
+      const req = await managerRequestForStore(cycleId, storeId);
+      return addRequestItem({
+        store_request_id: req.id,
+        item_id: item.id,
+        requested_qty: qty,
+        unit: item.default_unit,
+      });
+    },
+    onSuccess: () => {
+      toast.success(t.itemAdded);
+      setAddTarget(null);
+      void queryClient.invalidateQueries({ queryKey: allRequestsKey(cycleId) });
+    },
     onError: onApiError,
   });
 
@@ -136,6 +170,15 @@ export default function ManagerDashboard() {
                   </li>
                 ))}
               </ul>
+              {/* The manager can still add to a sent request — they are the one
+                  on the phone with the market (0013). */}
+              <Button
+                variant="ghost"
+                className="mt-2 w-full"
+                onClick={() => setAddTarget(req.store_id)}
+              >
+                ➕ {t.addItem}
+              </Button>
             </Card>
           ))}
         </div>
@@ -164,6 +207,20 @@ export default function ManagerDashboard() {
           {t.orderInFlight}
         </p>
       )}
+
+      <ItemPickerModal
+        open={addTarget !== null}
+        onClose={() => setAddTarget(null)}
+        excludeItemIds={
+          (requests ?? [])
+            .find((r) => r.store_id === addTarget)
+            ?.request_items.map((l) => l.item_id) ?? []
+        }
+        busy={addMutation.isPending}
+        onPick={(item, qty) =>
+          addTarget && addMutation.mutate({ storeId: addTarget, item, qty })
+        }
+      />
 
       {/* No "lock the cycle" step: sending the order to a vendor on the
           WhatsApp tab is what closes this cycle (migration 0012). */}

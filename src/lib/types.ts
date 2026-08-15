@@ -37,6 +37,8 @@ export type ProfileWithStore = Profile & {
 
 export type VendorOrderWithVendor = VendorOrder & {
   vendor: Pick<Vendor, "id" | "name" | "whatsapp_number">;
+  /** Null for orders placed before 0013, which were aggregated across stores. */
+  store: { id: string; name: string } | null;
 };
 
 /** Aggregated line for the manager's cross-store view */

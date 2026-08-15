@@ -216,6 +216,8 @@ export interface Database {
           id: string;
           cycle_id: string;
           vendor_id: string;
+          /** Null for orders placed before 0013 (aggregated across stores). */
+          store_id: string | null;
           message_snapshot: string;
           sent_at: string | null;
           created_at: string;
@@ -224,6 +226,7 @@ export interface Database {
           id?: string;
           cycle_id: string;
           vendor_id: string;
+          store_id?: string | null;
           message_snapshot: string;
           sent_at?: string | null;
         };
@@ -383,6 +386,10 @@ export interface Database {
       ensure_open_cycle: {
         Args: Record<string, never>;
         Returns: Database["public"]["Tables"]["order_cycles"]["Row"];
+      };
+      manager_request_for_store: {
+        Args: { p_cycle_id: string; p_store_id: string };
+        Returns: Database["public"]["Tables"]["store_requests"]["Row"];
       };
     };
     Enums: {

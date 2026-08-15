@@ -40,10 +40,12 @@ export async function updateVendor(
 /**
  * Record a vendor order: snapshot of the exact WhatsApp message + its lines.
  * The snapshot is the audit answer to "what did we actually order that day?".
+ * Orders are per branch (0013), so the store is part of the record.
  */
 export async function recordVendorOrder(
   cycleId: string,
   vendorId: string,
+  storeId: string,
   message: string,
   lines: (WaOrderLine & { item_id: string })[],
 ): Promise<void> {
@@ -52,6 +54,7 @@ export async function recordVendorOrder(
     .insert({
       cycle_id: cycleId,
       vendor_id: vendorId,
+      store_id: storeId,
       message_snapshot: message,
       sent_at: new Date().toISOString(),
     })
@@ -75,7 +78,7 @@ export async function fetchVendorOrders(
 ): Promise<VendorOrderWithVendor[]> {
   const { data, error } = await supabase
     .from("vendor_orders")
-    .select("*, vendor:vendors(id,name,whatsapp_number)")
+    .select("*, vendor:vendors(id,name,whatsapp_number), store:stores(id,name)")
     .eq("cycle_id", cycleId)
     .order("created_at", { ascending: false })
     .returns<VendorOrderWithVendor[]>();

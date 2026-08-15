@@ -48,6 +48,7 @@ export const ar: Strings = {
     COMPLETED: "مكتملة",
   } as Record<string, string>,
   noActiveCycle: "لا توجد دورة طلبات نشطة",
+  selectBranch: "المحل",
   readyToOrder:
     "عدّل أي كمية بالأعلى، ثم افتح تبويب واتساب لإرسال الطلب إلى الموردين. الإرسال يقفل هذه الدورة ويفتح التالية.",
   noOrderYet:

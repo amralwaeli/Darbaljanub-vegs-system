@@ -7,13 +7,12 @@ import {
   Button,
   Card,
   Input,
-  Select,
   SkeletonList,
 } from "../../components/ui";
 import { useToast } from "../../components/Toast";
 import { ApiError } from "../../lib/api/helpers";
 import { t } from "../../i18n/strings";
-import { UNITS, type Item } from "../../lib/types";
+import { type Item } from "../../lib/types";
 
 export function ItemsAdmin() {
   const toast = useToast();
@@ -87,7 +86,6 @@ export function ItemsAdmin() {
                 )}
                 {!item.is_active && <Badge color="red">{t.inactive}</Badge>}
               </div>
-              <div className="text-xs text-gray-400">{item.default_unit}</div>
             </div>
             {!item.is_approved && (
               <Button
@@ -126,20 +124,10 @@ export function ItemsAdmin() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          {/* The unit belongs to the item, not to each request line — it is
-              set once here and every list then shows just a name and a
-              number. No icon field: the catalogue is text-only. */}
-          <Select
-            label={t.newItemUnit}
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-          >
-            {UNITS.map((u) => (
-              <option key={u} value={u}>
-                {t.units[u]}
-              </option>
-            ))}
-          </Select>
+          {/* No unit field and no icon field: the catalogue is name-only, and
+              every list shows a name and a number. `unit` is still carried on
+              the row (defaulting to kg) because delivery and vendor records
+              store it, but nothing in the UI shows or sets it. */}
           {editing !== "new" && editing !== null && (
             <Button
               variant="secondary"

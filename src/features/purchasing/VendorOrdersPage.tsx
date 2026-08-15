@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOrderingCycle, cycleKeys } from "../cycles/useCycle";
-import { aggregateRequests, fetchAllRequests } from "../../lib/api/requests";
+import { fetchAllRequests } from "../../lib/api/requests";
 import {
   fetchVendorOrders,
   fetchVendors,
@@ -32,6 +32,9 @@ export default function VendorOrdersPage() {
   const { data: cycle, isLoading: cycleLoading } = useOrderingCycle();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [vendorId, setVendorId] = useState("");
+  // Orders are placed one branch at a time (0013): the vendor delivers to each
+  // shop, so mixing two shops into one message would be undeliverable.
+  const [storeId, setStoreId] = useState("");
 
   const cycleId = cycle?.id ?? "";
   // OPEN is included: sending the first order is what locks the cycle, so the
@@ -55,34 +58,44 @@ export default function VendorOrdersPage() {
     enabled: Boolean(cycleId && ready),
   });
 
-  const aggregated = useMemo(
-    () => aggregateRequests(requests ?? []),
-    [requests],
-  );
   const activeVendors = (vendors ?? []).filter((v) => v.is_active);
   const vendor = activeVendors.find((v) => v.id === vendorId) ?? null;
 
-  const chosenLines = aggregated.filter((a) =>
-    selected.has(`${a.item_id}|${a.unit}`),
-  );
-  const message = vendor
-    ? buildVendorMessage(
-        vendor.name,
-        chosenLines.map((l) => ({ name: l.name, qty: l.total_qty, unit: l.unit })),
-        cycle?.cycle_date ?? "",
-      )
-    : "";
+  const branches = (requests ?? []).map((r) => r.store);
+  const request = (requests ?? []).find((r) => r.store_id === storeId) ?? null;
+  const lines = request?.request_items ?? [];
+
+  // Default to the first branch, and drop a selection that no longer exists.
+  useEffect(() => {
+    if (branches.length === 0) return;
+    if (!branches.some((b) => b.id === storeId)) setStoreId(branches[0].id);
+  }, [branches, storeId]);
+
+  const chosenLines = lines.filter((l) => selected.has(l.id));
+  const message =
+    request && chosenLines.length > 0
+      ? buildVendorMessage(
+          request.store.name,
+          chosenLines.map((l) => ({
+            name: l.item.name,
+            qty: Number(l.requested_qty),
+            unit: l.unit,
+          })),
+          cycle?.cycle_date ?? "",
+        )
+      : "";
 
   const sendMutation = useMutation({
     mutationFn: () =>
       recordVendorOrder(
         cycleId,
         vendor!.id,
+        storeId,
         message,
         chosenLines.map((l) => ({
           item_id: l.item_id,
-          name: l.name,
-          qty: l.total_qty,
+          name: l.item.name,
+          qty: Number(l.requested_qty),
           unit: l.unit,
         })),
       ),
@@ -127,18 +140,33 @@ export default function VendorOrdersPage() {
 
       {isLoading ? (
         <SkeletonList />
-      ) : aggregated.length === 0 ? (
+      ) : branches.length === 0 ? (
         <EmptyState emoji="📭" message={t.noRequestsYet} />
       ) : (
         <>
+          <Select
+            label={t.selectBranch}
+            className="mb-3"
+            value={storeId}
+            onChange={(e) => {
+              setStoreId(e.target.value);
+              setSelected(new Set()); // a tick on one branch means nothing on another
+            }}
+          >
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+
           <div className="space-y-2">
-            {aggregated.map((agg) => {
-              const key = `${agg.item_id}|${agg.unit}`;
-              const checked = selected.has(key);
+            {lines.map((line) => {
+              const checked = selected.has(line.id);
               return (
                 <button
-                  key={key}
-                  onClick={() => toggle(key)}
+                  key={line.id}
+                  onClick={() => toggle(line.id)}
                   className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 bg-white p-3 text-start transition-colors ${
                     checked ? "border-brand-600 bg-brand-50" : "border-transparent shadow-sm ring-1 ring-black/5"
                   }`}
@@ -152,11 +180,9 @@ export default function VendorOrdersPage() {
                   >
                     ✓
                   </span>
-                  <span className="flex-1 font-semibold">
-                    {agg.name}
-                  </span>
+                  <span className="flex-1 font-semibold">{line.item.name}</span>
                   <span className="font-bold text-brand-700">
-                    {fmtQty(agg.total_qty)}
+                    {fmtQty(line.requested_qty)}
                   </span>
                 </button>
               );
@@ -207,6 +233,11 @@ export default function VendorOrdersPage() {
                 <span className="font-semibold">{order.vendor.name}</span>
                 <Badge color="green">{fmtTime(order.sent_at)}</Badge>
               </div>
+              {order.store && (
+                <div className="mt-0.5 text-xs text-gray-500">
+                  {order.store.name}
+                </div>
+              )}
               <div className="mt-2 flex gap-2">
                 <a
                   className="flex min-h-10 flex-1 items-center justify-center rounded-xl border border-brand-600 text-sm font-semibold text-brand-700 active:bg-brand-50"

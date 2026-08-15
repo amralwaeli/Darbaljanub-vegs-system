@@ -46,6 +46,7 @@ export const en = {
     COMPLETED: "Completed",
   } as Record<string, string>,
   noActiveCycle: "No active order cycle",
+  selectBranch: "Branch",
   readyToOrder:
     "Adjust any quantity above, then open the WhatsApp tab to send the order to your vendors. Sending closes this cycle and opens the next one.",
   noOrderYet:

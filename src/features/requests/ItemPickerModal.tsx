@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../../components/Modal";
-import { Button, Input, Select, Spinner } from "../../components/ui";
+import { Button, Input, Spinner } from "../../components/ui";
 import { fetchCatalog, proposeItem } from "../../lib/api/items";
 import { useToast } from "../../components/Toast";
 import { useAuth } from "../auth/AuthProvider";
 import { ApiError } from "../../lib/api/helpers";
 import { t } from "../../i18n/strings";
-import { UNITS, type Item } from "../../lib/types";
+import { type Item } from "../../lib/types";
 
 export function ItemPickerModal({
   open,
@@ -30,7 +30,9 @@ export function ItemPickerModal({
   const [unit, setUnit] = useState<string>("kg");
   const [proposeMode, setProposeMode] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newUnit, setNewUnit] = useState<string>("kg");
+  // Units are never shown or chosen in the UI; a proposed item takes the
+  // catalogue default and the manager can change it in the database if needed.
+  const newUnit = "kg";
   const [proposing, setProposing] = useState(false);
 
   const { data: catalog, isLoading } = useQuery({
@@ -124,17 +126,6 @@ export function ItemPickerModal({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
-          <Select
-            label={t.newItemUnit}
-            value={newUnit}
-            onChange={(e) => setNewUnit(e.target.value)}
-          >
-            {UNITS.map((u) => (
-              <option key={u} value={u}>
-                {t.units[u]}
-              </option>
-            ))}
-          </Select>
           <div className="flex gap-2">
             <Button
               variant="secondary"

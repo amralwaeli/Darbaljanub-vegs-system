@@ -71,6 +71,22 @@ export async function submitStoreRequest(id: string): Promise<StoreRequest> {
   return must(data, error);
 }
 
+/**
+ * Manager/superadmin: get the store's request for this cycle, creating it if
+ * the store never sent one. SECURITY DEFINER server-side (0013) because the
+ * insert policy on store_requests is PIC-scoped.
+ */
+export async function managerRequestForStore(
+  cycleId: string,
+  storeId: string,
+): Promise<StoreRequest> {
+  const { data, error } = await supabase.rpc("manager_request_for_store", {
+    p_cycle_id: cycleId,
+    p_store_id: storeId,
+  });
+  return must<StoreRequest>(data, error);
+}
+
 export async function addRequestItem(input: {
   store_request_id: string;
   item_id: string;

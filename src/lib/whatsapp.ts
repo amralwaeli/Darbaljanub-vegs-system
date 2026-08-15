@@ -10,15 +10,17 @@ export interface WaOrderLine {
 }
 
 /**
- * Clean, copy-paste-friendly order message for one market vendor.
+ * Order message for one BRANCH, sent to a market vendor over WhatsApp.
  *
- * Written in the UI language — the market vendors are Arabic speakers, so this
- * goes out in Arabic by default. Unlike the in-app lists, each line KEEPS its
- * unit: the vendor is the one person who has to know whether "5" means five
- * kilos or five boxes.
+ * Addressed to the branch, not the vendor: the vendor delivers to each shop, so
+ * the shop name is the useful line — they already know who they are. One order
+ * per branch, so the message never mixes two shops' goods.
+ *
+ * Name and quantity only. Units are not shown anywhere in the system; each item
+ * carries a single unit fixed in the catalogue.
  */
 export function buildVendorMessage(
-  vendorName: string,
+  branchName: string,
   lines: WaOrderLine[],
   cycleDate: string,
 ): string {
@@ -32,10 +34,10 @@ export function buildVendorMessage(
       (l) =>
         `• ${l.name} — ${l.qty.toLocaleString(locale, {
           maximumFractionDigits: 2,
-        })} ${t.units[l.unit] ?? l.unit}`,
+        })}`,
     )
     .join("\n");
-  return `*${t.waOrderTitle} — ${date}*\n${t.waTo}: ${vendorName}\n\n${body}\n\n${t.waLineCount}: ${lines.length}\n${t.waFooter}`;
+  return `*${t.waOrderTitle} — ${date}*\n${t.waTo}: ${branchName}\n\n${body}\n\n${t.waLineCount}: ${lines.length}\n${t.waFooter}`;
 }
 
 export function waLink(whatsappNumber: string, message: string): string {
