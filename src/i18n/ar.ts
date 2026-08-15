@@ -214,10 +214,6 @@ export const ar: Strings = {
   notificationsOff: "تم إيقاف الإشعارات",
   notificationsDenied:
     "الإشعارات محظورة — اسمح بها من إعدادات المتصفح أو التطبيق",
-  notificationsWhy:
-    "استلم تنبيهات على هذا الجهاز للخطوات التي تخص دورك — الطلبات الجديدة والأسعار والتحميل والتوصيل.",
-  notificationsEnableNow: "تفعيل",
-  notificationsLater: "لاحقاً",
 
   // generic
   loading: "جارٍ التحميل…",

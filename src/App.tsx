@@ -24,7 +24,7 @@ import type { UserRole } from "./lib/database.types";
 
 function FullSpinner() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex h-full items-center justify-center">
       <Spinner className="h-8 w-8 text-brand-600" />
     </div>
   );
@@ -33,7 +33,7 @@ function FullSpinner() {
 function DisabledScreen() {
   const { signOut } = useAuth();
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
       <span className="text-4xl">🔒</span>
       <p className="max-w-sm text-gray-600">{t.accountDisabled}</p>
       <Button variant="secondary" onClick={() => void signOut()}>

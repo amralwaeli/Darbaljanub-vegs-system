@@ -36,7 +36,9 @@ export function BottomNav() {
   if (!tabs || tabs.length <= 1) return null;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
+    // Part of the shell's flex column now, not fixed over a scrolling
+    // document — the document no longer scrolls.
+    <nav className="z-40 shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto flex max-w-lg">
         {tabs.map((tab) => (
           <NavLink

@@ -30,7 +30,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-brand-50 p-6">
+    // Own scroll pane: the document is locked, so with the keyboard open this
+    // is what lets the PIN field stay reachable.
+    <div className="scroll-pane flex h-full flex-col items-center justify-center bg-brand-50 p-6 [&>*]:shrink-0">
       <button
         onClick={toggleLanguage}
         className="absolute top-4 end-4 min-h-10 rounded-xl px-3 text-sm font-semibold text-brand-700 active:bg-brand-100"

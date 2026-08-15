@@ -3,17 +3,53 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    -webkit-tap-highlight-color: transparent;
+  /*
+    App shell, not a document. The page itself never scrolls — only the <main>
+    pane inside Layout does. This is what stops the whole UI sliding under the
+    address bar, rubber-banding at the edges, and pull-to-refreshing mid-form.
+  */
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
+
+  #root {
+    height: 100%;
+  }
+
   body {
     @apply bg-brand-50 text-gray-900 antialiased;
-    /* room for the bottom nav + iOS home indicator */
-    padding-bottom: env(safe-area-inset-bottom);
+    /* Chrome/WebView affordances that read as "this is a web page". */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
+
+  /* Text the user genuinely needs to select or copy stays selectable. */
+  input,
+  textarea,
+  [contenteditable="true"],
+  .selectable {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+  }
+
   input,
   select,
   textarea {
     font-size: 16px; /* prevents iOS zoom-on-focus */
+  }
+
+  /* Every scrollable pane: momentum scrolling, and no scroll chaining out to
+     the locked document behind it. */
+  .scroll-pane {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }

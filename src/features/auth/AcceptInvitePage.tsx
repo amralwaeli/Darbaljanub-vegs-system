@@ -22,7 +22,7 @@ export default function AcceptInvitePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex h-full items-center justify-center">
         <Spinner className="h-8 w-8 text-brand-600" />
       </div>
     );
@@ -30,7 +30,7 @@ export default function AcceptInvitePage() {
 
   if (!session) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
+      <div className="scroll-pane flex h-full flex-col items-center justify-center [&>*]:shrink-0 p-6 text-center">
         <span className="mb-3 text-4xl">✉️</span>
         <p className="max-w-sm text-gray-600">{t.inviteLinkInvalid}</p>
       </div>
@@ -58,7 +58,7 @@ export default function AcceptInvitePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-brand-50 p-6">
+    <div className="scroll-pane flex h-full flex-col items-center justify-center [&>*]:shrink-0 bg-brand-50 p-6">
       <div className="mb-6 text-center">
         <div className="mb-2 text-5xl">🥬</div>
         <h1 className="text-xl font-bold text-brand-800">

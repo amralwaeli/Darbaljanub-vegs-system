@@ -204,5 +204,15 @@ create trigger t_lock_cycle_on_vendor_order
   for each row
   execute function public.lock_cycle_on_vendor_order();
 
--- Existing rows predate the draft concept and were all effectively sent.
-update public.store_requests set status = 'SUBMITTED' where status is null;
+-- ------------------------------------------------------ legacy rows --------
+-- Under the old default every request was born SUBMITTED on the store's first
+-- item, so "SUBMITTED" carries no information about whether anyone actually
+-- pressed Send. Any request still sitting in an OPEN cycle therefore has not
+-- been ordered against and belongs back in the store's hands as a draft.
+-- (Requests in ORDERED or later cycles were genuinely acted on: left alone.)
+update public.store_requests sr
+set status = 'DRAFT'
+from public.order_cycles oc
+where oc.id = sr.cycle_id
+  and oc.status = 'OPEN'
+  and sr.status = 'SUBMITTED';
