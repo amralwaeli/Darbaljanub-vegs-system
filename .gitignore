@@ -15,6 +15,8 @@ twa/*
 !twa/pages-root/**
 .env
 .env.local
+# Data snapshots from scripts/backup-data.mjs — contain PII (names, emails, IPs)
+backups/
 *.local
 .DS_Store
 supabase/.temp/

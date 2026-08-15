@@ -1,6 +1,6 @@
 import { supabase } from "../supabase";
 import { must, maybe, ApiError } from "./helpers";
-import { compressImage } from "../imageCompress";
+import { compressImage, ImageCompressError } from "../imageCompress";
 import { enqueueCheck } from "../offlineQueue";
 import { t } from "../../i18n/strings";
 import type { DeliveryWithStore } from "../types";
@@ -69,17 +69,43 @@ export async function setCheck(
   }
 }
 
-/** Compress on-device, then upload to the private bucket. Returns the path. */
+/**
+ * Compress on-device, then upload to the private bucket. Returns the path.
+ *
+ * The two failure modes are reported separately on purpose. Compression fails
+ * before any network call, so blaming the connection there sends the driver
+ * chasing the wrong thing — that mistake is what hid this bug in the first
+ * place.
+ */
 export async function uploadDeliveryPhoto(
   deliveryId: string,
   file: File | Blob,
 ): Promise<string> {
-  const compressed = await compressImage(file);
-  const path = `${deliveryId}/${Date.now()}.jpg`;
+  let result;
+  try {
+    result = await compressImage(file);
+  } catch (e) {
+    throw new ApiError(
+      e instanceof ImageCompressError ? e.detail : t.photoFailed,
+      e,
+    );
+  }
+
+  // Falling back means the original file is going up unshrunk; keep the
+  // content type honest so the bucket's MIME check sees the truth.
+  const contentType = result.fellBack
+    ? ((file as File).type ?? "image/jpeg")
+    : "image/jpeg";
+  const extension = contentType === "image/webp" ? "webp" : "jpg";
+  const path = `${deliveryId}/${Date.now()}.${extension}`;
+
   const { error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, compressed, { contentType: "image/jpeg", upsert: false });
-  if (error) throw new ApiError(t.photoFailed, error);
+    .upload(path, result.blob, { contentType, upsert: false });
+  if (error) {
+    console.error("[photo] upload failed", error.message);
+    throw new ApiError(`${t.photoFailed} (${error.message})`, error);
+  }
   return path;
 }
 

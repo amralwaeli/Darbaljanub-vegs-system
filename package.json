@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "seed": "node scripts/seed.mjs",
+    "backup": "node scripts/backup-data.mjs",
+    "restore": "node scripts/restore-data.mjs",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1"
   },
   "dependencies": {

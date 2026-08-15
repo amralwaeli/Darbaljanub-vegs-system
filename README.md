@@ -256,6 +256,44 @@ read; immutable from clients.
 SQL editor and proves: PIC cannot see other stores, driver cannot select any
 price, anon sees nothing, deactivated users lose everything.
 
+## 6b. Backup and restore (free tier has NONE)
+
+The free plan has no automatic backups, no point-in-time recovery, and no
+download button. If the project is deleted or a migration goes wrong, the data
+is gone. Two halves make a recoverable snapshot:
+
+* **Schema** — already in git, `supabase/migrations/*.sql`, applied in filename order.
+* **Data** — `npm run backup`, which writes one JSON file per table to
+  `backups/<date>/`. Needs `SUPABASE_SERVICE_ROLE_KEY` in `.env`. No `pg_dump`
+  or Docker required.
+
+```bash
+npm run backup                          # -> backups/2026-08-15/*.json
+npm run restore backups/2026-08-15      # replays rows into an EMPTY schema
+```
+
+`backups/` is gitignored: the files contain names, emails and IP addresses.
+
+**Restore procedure**, in order:
+
+1. Create the project and run every migration in `supabase/migrations/` in
+   filename order. `0014` must commit before `0015` (enum value, see its header).
+2. `npm run restore backups/<date>` — upserts parents before children, safe to
+   re-run.
+3. Recreate logins. **`auth.users` is not backed up** — PIN hashes live in the
+   `auth` schema, which PostgREST does not expose. Either re-invite everyone
+   from Admin → Users, or run `npm run seed` for demo accounts. A restored
+   `profiles` row has no login behind it until an auth user exists with a
+   *matching id*.
+4. Re-set `app_config` values — the push webhook secret is redacted at backup
+   time on purpose. See §5b.
+5. Re-create the `delivery-photos` bucket (migration `0005`) and accept that
+   photo objects themselves are not in the JSON backup.
+
+**Not covered:** storage objects, auth users, Edge Function secrets. For those,
+the mitigation is that photos are disposable proof and users are re-invitable —
+if that stops being true, the fix is a paid tier with PITR, not a bigger script.
+
 ## 7. Free-tier limits & what to watch
 
 | Resource | Free limit | This app | Watch when |
