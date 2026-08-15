@@ -80,7 +80,12 @@ cycle.
                       └───────────┘
 
   Per-store delivery sub-machine:  PENDING ──(driver: photo + all ticks)──▶ LOADED
-                                   LOADED ──(PIC confirms receipt)───────▶ RECEIVED
+                                   LOADED ──(driver: offload photo)──────▶ OFFLOADED
+                                   OFFLOADED ──(PIC confirms receipt)────▶ RECEIVED
+
+  Two photos, two parties: the driver proves what left the market AND what was
+  handed over at the shop; the shop separately confirms it received it. Both
+  photos are required by deliveries_guard, not by the UI.
 
   All transitions validated by BEFORE UPDATE triggers — invalid jumps raise
   exceptions regardless of what any client sends. SuperAdmin may override.

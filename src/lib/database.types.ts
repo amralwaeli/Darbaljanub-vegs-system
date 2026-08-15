@@ -21,7 +21,11 @@ export type CycleStatus =
   | "IN_DELIVERY"
   | "COMPLETED";
 export type RequestStatus = "DRAFT" | "SUBMITTED";
-export type DeliveryStatus = "PENDING" | "LOADED" | "RECEIVED";
+export type DeliveryStatus =
+  | "PENDING"
+  | "LOADED"
+  | "OFFLOADED"
+  | "RECEIVED";
 
 export interface Database {
   public: {
@@ -264,7 +268,9 @@ export interface Database {
           driver_id: string | null;
           status: DeliveryStatus;
           photo_path: string | null;
+          offload_photo_path: string | null;
           loaded_at: string | null;
+          offloaded_at: string | null;
           received_at: string | null;
           created_at: string;
           updated_at: string;
@@ -277,6 +283,7 @@ export interface Database {
         Update: {
           status?: DeliveryStatus;
           photo_path?: string | null;
+          offload_photo_path?: string | null;
         };
         Relationships: [];
       };

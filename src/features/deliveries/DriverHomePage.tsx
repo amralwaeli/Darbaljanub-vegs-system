@@ -22,6 +22,7 @@ const STATUS_BADGE: Record<
 > = {
   PENDING: { color: "gray", label: t.pending },
   LOADED: { color: "blue", label: t.loaded },
+  OFFLOADED: { color: "blue", label: t.offloadedShort },
   RECEIVED: { color: "green", label: t.received },
 };
 

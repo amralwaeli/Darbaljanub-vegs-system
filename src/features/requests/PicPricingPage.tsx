@@ -84,10 +84,9 @@ export default function PicPricingPage() {
     onError: onApiError,
   });
 
-  async function showPhoto() {
-    if (!myDelivery?.photo_path) return;
+  async function showPhoto(path: string) {
     try {
-      setPhotoUrl(await getPhotoUrl(myDelivery.photo_path));
+      setPhotoUrl(await getPhotoUrl(path));
     } catch (e) {
       onApiError(e);
     }
@@ -186,16 +185,18 @@ export default function PicPricingPage() {
               color={
                 myDelivery.status === "RECEIVED"
                   ? "green"
-                  : myDelivery.status === "LOADED"
-                    ? "blue"
-                    : "gray"
+                  : myDelivery.status === "PENDING"
+                    ? "gray"
+                    : "blue"
               }
             >
               {myDelivery.status === "PENDING"
                 ? t.pending
                 : myDelivery.status === "LOADED"
                   ? t.loaded
-                  : t.received}
+                  : myDelivery.status === "OFFLOADED"
+                    ? t.offloadedShort
+                    : t.received}
             </Badge>
           </div>
           {myDelivery.loaded_at && (
@@ -203,17 +204,32 @@ export default function PicPricingPage() {
               {t.loadedAt}: {fmtTime(myDelivery.loaded_at)}
             </p>
           )}
-          <div className="mt-3 flex gap-2">
+          {myDelivery.offloaded_at && (
+            <p className="mt-1 text-sm text-gray-500">
+              {t.offloadedAt}: {fmtTime(myDelivery.offloaded_at)}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
             {myDelivery.photo_path && (
               <Button
                 variant="secondary"
                 className="flex-1"
-                onClick={() => void showPhoto()}
+                onClick={() => void showPhoto(myDelivery.photo_path!)}
               >
                 📷 {t.viewPhoto}
               </Button>
             )}
-            {myDelivery.status === "LOADED" && (
+            {myDelivery.offload_photo_path && (
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => void showPhoto(myDelivery.offload_photo_path!)}
+              >
+                📷 {t.viewOffloadPhoto}
+              </Button>
+            )}
+            {/* Receipt is confirmed after the driver has offloaded (0015). */}
+            {myDelivery.status === "OFFLOADED" && (
               <Button
                 className="flex-1"
                 onClick={() => setConfirmReceive(true)}

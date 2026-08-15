@@ -98,6 +98,22 @@ export async function markLoaded(
   must(true, error);
 }
 
+/**
+ * "Offloaded" — the driver has handed the goods over at the branch. The guard
+ * trigger requires the offload photo, so proof of the drop-off cannot be
+ * skipped any more than proof of the load can.
+ */
+export async function markOffloaded(
+  deliveryId: string,
+  offloadPhotoPath: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("deliveries")
+    .update({ status: "OFFLOADED", offload_photo_path: offloadPhotoPath })
+    .eq("id", deliveryId);
+  must(true, error);
+}
+
 export async function markReceived(deliveryId: string): Promise<void> {
   const { error } = await supabase
     .from("deliveries")

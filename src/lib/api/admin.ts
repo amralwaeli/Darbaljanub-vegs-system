@@ -43,7 +43,11 @@ export async function updateStore(
 export async function fetchUsers(): Promise<ProfileWithStore[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("*, store:stores(id,name)")
+    // Disambiguated FK: profiles<->stores has TWO relationships — this one
+    // (profiles.store_id) and stores.pic_id pointing back. A bare
+    // `stores(...)` embed is rejected with PGRST201, which silently emptied
+    // the users list. Every other table embeds stores by a single FK.
+    .select("*, store:stores!profiles_store_id_fkey(id,name)")
     .order("created_at")
     .returns<ProfileWithStore[]>();
   return must(data, error);

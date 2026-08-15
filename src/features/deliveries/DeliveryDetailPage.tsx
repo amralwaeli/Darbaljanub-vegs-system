@@ -6,6 +6,7 @@ import {
   fetchDelivery,
   getPhotoUrl,
   markLoaded,
+  markOffloaded,
   setCheck,
   uploadDeliveryPhoto,
 } from "../../lib/api/deliveries";
@@ -31,10 +32,16 @@ export default function DeliveryDetailPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const offloadInputRef = useRef<HTMLInputElement>(null);
   const [photoPath, setPhotoPath] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [confirmLoad, setConfirmLoad] = useState(false);
+  // Second proof, taken at the branch when the goods come off the truck.
+  const [offloadPath, setOffloadPath] = useState<string | null>(null);
+  const [offloadPreview, setOffloadPreview] = useState<string | null>(null);
+  const [offloadUploading, setOffloadUploading] = useState(false);
+  const [confirmOffload, setConfirmOffload] = useState(false);
 
   const { data: delivery, isLoading } = useQuery({
     queryKey: deliveryKey(deliveryId),
@@ -50,10 +57,14 @@ export default function DeliveryDetailPage() {
   });
 
   const pending = delivery?.status === "PENDING";
+  const loaded = delivery?.status === "LOADED";
   const allChecked =
     (checklist ?? []).length > 0 && (checklist ?? []).every((c) => c.checked);
   const effectivePhotoPath = photoPath ?? delivery?.photo_path ?? null;
   const canLoad = pending && allChecked && Boolean(effectivePhotoPath);
+  const effectiveOffloadPath =
+    offloadPath ?? delivery?.offload_photo_path ?? null;
+  const canOffload = loaded && Boolean(effectiveOffloadPath);
 
   const onApiError = (e: unknown) =>
     toast.error(e instanceof ApiError ? e.message : t.errorGeneric);
@@ -82,18 +93,25 @@ export default function DeliveryDetailPage() {
     },
   });
 
-  async function onPhotoChosen(file: File | undefined) {
+  /** Both photos go through the same path — only which slot they fill differs. */
+  async function onPhotoChosen(
+    file: File | undefined,
+    kind: "load" | "offload",
+  ) {
     if (!file || !delivery) return;
-    setUploading(true);
-    setPhotoPreview(URL.createObjectURL(file));
+    const setBusy = kind === "load" ? setUploading : setOffloadUploading;
+    const setPreview = kind === "load" ? setPhotoPreview : setOffloadPreview;
+    const setPath = kind === "load" ? setPhotoPath : setOffloadPath;
+
+    setBusy(true);
+    setPreview(URL.createObjectURL(file));
     try {
-      const path = await uploadDeliveryPhoto(delivery.id, file);
-      setPhotoPath(path);
+      setPath(await uploadDeliveryPhoto(delivery.id, file));
     } catch (e) {
-      setPhotoPreview(null);
+      setPreview(null);
       onApiError(e);
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
   }
 
@@ -108,6 +126,21 @@ export default function DeliveryDetailPage() {
     },
     onError: (e) => {
       setConfirmLoad(false);
+      onApiError(e);
+    },
+  });
+
+  const offloadMutation = useMutation({
+    mutationFn: () => markOffloaded(deliveryId, effectiveOffloadPath!),
+    onSuccess: () => {
+      setConfirmOffload(false);
+      toast.success(t.offloaded);
+      void queryClient.invalidateQueries({ queryKey: deliveryKey(deliveryId) });
+      void queryClient.invalidateQueries({ queryKey: ["deliveries"] });
+      navigate("/", { replace: true });
+    },
+    onError: (e) => {
+      setConfirmOffload(false);
       onApiError(e);
     },
   });
@@ -224,7 +257,7 @@ export default function DeliveryDetailPage() {
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={(e) => void onPhotoChosen(e.target.files?.[0])}
+              onChange={(e) => void onPhotoChosen(e.target.files?.[0], "load")}
             />
             <Button
               variant="secondary"
@@ -258,9 +291,61 @@ export default function DeliveryDetailPage() {
         </>
       )}
 
+      {/* At the branch: second photo, then offload. The guard trigger rejects
+          OFFLOADED without the photo, so this cannot be skipped. */}
+      {loaded && (
+        <Card className="mt-4">
+          <h2 className="mb-2 font-bold text-gray-700">{t.offloadProof}</h2>
+          {offloadPreview ? (
+            <img
+              src={offloadPreview}
+              alt={t.offloadProof}
+              className="mb-2 w-full rounded-xl"
+            />
+          ) : null}
+          <input
+            ref={offloadInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => void onPhotoChosen(e.target.files?.[0], "offload")}
+          />
+          <Button
+            variant="secondary"
+            className="w-full"
+            busy={offloadUploading}
+            onClick={() => offloadInputRef.current?.click()}
+          >
+            📷 {offloadPreview ? t.retakePhoto : t.takePhoto}
+          </Button>
+          {offloadUploading && (
+            <p className="mt-2 text-sm text-gray-500">{t.photoUploading}</p>
+          )}
+
+          <Button
+            className="mt-3 w-full text-lg"
+            disabled={!canOffload}
+            onClick={() => setConfirmOffload(true)}
+          >
+            📦 {t.markOffloaded}
+          </Button>
+          {!canOffload && (
+            <p className="mt-2 text-center text-xs text-gray-400">
+              {t.offloadPhotoFirst}
+            </p>
+          )}
+        </Card>
+      )}
+
       {delivery.loaded_at && (
         <p className="mt-3 text-center text-sm text-gray-500">
           {t.loadedAt}: {fmtTime(delivery.loaded_at)}
+        </p>
+      )}
+      {delivery.offloaded_at && (
+        <p className="mt-1 text-center text-sm text-gray-500">
+          {t.offloadedAt}: {fmtTime(delivery.offloaded_at)}
         </p>
       )}
       {delivery.received_at && (
@@ -276,6 +361,15 @@ export default function DeliveryDetailPage() {
         busy={loadMutation.isPending}
         onCancel={() => setConfirmLoad(false)}
         onConfirm={() => loadMutation.mutate()}
+      />
+
+      <ConfirmDialog
+        open={confirmOffload}
+        title={t.markOffloaded}
+        message={t.markOffloadedConfirm}
+        busy={offloadMutation.isPending}
+        onCancel={() => setConfirmOffload(false)}
+        onConfirm={() => offloadMutation.mutate()}
       />
     </>
   );

@@ -81,16 +81,18 @@ export default function DeliveriesOverviewPage() {
                 color={
                   delivery.status === "RECEIVED"
                     ? "green"
-                    : delivery.status === "LOADED"
-                      ? "blue"
-                      : "gray"
+                    : delivery.status === "PENDING"
+                      ? "gray"
+                      : "blue"
                 }
               >
                 {delivery.status === "PENDING"
                   ? t.pending
                   : delivery.status === "LOADED"
                     ? t.loaded
-                    : t.received}
+                    : delivery.status === "OFFLOADED"
+                      ? t.offloadedShort
+                      : t.received}
               </Badge>
             </div>
             <div className="mt-1 space-y-0.5 text-sm text-gray-500">
@@ -99,21 +101,36 @@ export default function DeliveriesOverviewPage() {
                   {t.loadedAt}: {fmtTime(delivery.loaded_at)}
                 </p>
               )}
+              {delivery.offloaded_at && (
+                <p>
+                  {t.offloadedAt}: {fmtTime(delivery.offloaded_at)}
+                </p>
+              )}
               {delivery.received_at && (
                 <p>
                   {t.receivedAt}: {fmtTime(delivery.received_at)}
                 </p>
               )}
             </div>
-            {delivery.photo_path && (
-              <button
-                className="mt-2 flex min-h-10 items-center gap-1 rounded-xl px-3 text-sm font-semibold text-brand-700 active:bg-brand-50"
-                onClick={() => void openPhoto(delivery.photo_path!)}
-              >
-                📷 {t.viewPhoto}
-                {photoLoading && <Spinner className="h-4 w-4" />}
-              </button>
-            )}
+            <div className="flex flex-wrap gap-1">
+              {delivery.photo_path && (
+                <button
+                  className="mt-2 flex min-h-10 items-center gap-1 rounded-xl px-3 text-sm font-semibold text-brand-700 active:bg-brand-50"
+                  onClick={() => void openPhoto(delivery.photo_path!)}
+                >
+                  📷 {t.viewPhoto}
+                  {photoLoading && <Spinner className="h-4 w-4" />}
+                </button>
+              )}
+              {delivery.offload_photo_path && (
+                <button
+                  className="mt-2 flex min-h-10 items-center gap-1 rounded-xl px-3 text-sm font-semibold text-brand-700 active:bg-brand-50"
+                  onClick={() => void openPhoto(delivery.offload_photo_path!)}
+                >
+                  📷 {t.viewOffloadPhoto}
+                </button>
+              )}
+            </div>
           </Card>
         ))}
       </div>

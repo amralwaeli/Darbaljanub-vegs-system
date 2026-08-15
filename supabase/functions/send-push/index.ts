@@ -54,6 +54,10 @@ const MESSAGES = {
     title: "🚚 تم التحميل",
     body: `تم تحميل بضاعة ${store} — في الطريق`,
   }),
+  delivery_offloaded: (store: string) => ({
+    title: "📦 وصلت البضاعة",
+    body: `تم تنزيل بضاعة ${store} — يرجى تأكيد الاستلام`,
+  }),
   delivery_received: (store: string) => ({
     title: "✅ تم الاستلام",
     body: `أكد ${store} استلام البضاعة`,
@@ -125,6 +129,17 @@ Deno.serve(async (req) => {
         );
       userIds = (data ?? []).map((p) => p.id);
       message = MESSAGES.delivery_loaded(await storeName(record.store_id));
+    } else if (event === "delivery_offloaded") {
+      // The shop is the one who has to act next, so they lead the recipients.
+      const { data } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("is_active", true)
+        .or(
+          `role.in.(manager,superadmin),and(role.eq.pic,store_id.eq.${record.store_id})`,
+        );
+      userIds = (data ?? []).map((p) => p.id);
+      message = MESSAGES.delivery_offloaded(await storeName(record.store_id));
     } else if (event === "delivery_received") {
       userIds = await byRole("manager", "superadmin");
       message = MESSAGES.delivery_received(await storeName(record.store_id));
