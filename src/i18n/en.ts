@@ -226,6 +226,10 @@ export const en = {
   notificationsOff: "Notifications disabled",
   notificationsDenied:
     "Notifications are blocked — allow them in your browser/app settings",
+  notificationsWhy:
+    "Turn on alerts for this device so you hear about the steps that concern your role — new store requests, prices, loads and deliveries.",
+  notificationsEnableNow: "Turn on",
+  notificationsLater: "Later",
 
   // generic
   loading: "Loading…",

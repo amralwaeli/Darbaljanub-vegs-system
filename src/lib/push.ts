@@ -34,6 +34,49 @@ export async function isPushEnabled(): Promise<boolean> {
   return (await registration.pushManager.getSubscription()) !== null;
 }
 
+/**
+ * Register this device WITHOUT prompting — the closest thing to "on by
+ * default" that a browser permits.
+ *
+ * Runs on every launch. If permission was already granted at some point, this
+ * silently (re)creates the subscription and writes the row back, covering the
+ * cases that quietly leave a user unreachable: an endpoint we pruned after a
+ * failed send, a rotated endpoint, a reinstall, a cleared table.
+ *
+ * Returns false and never throws when permission has not been granted — only
+ * a real user tap can obtain it, so enablePush() handles that path.
+ */
+export async function ensurePushRegistered(userId: string): Promise<boolean> {
+  try {
+    if (!pushSupported() || Notification.permission !== "granted") return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const json = subscription.toJSON();
+    // onConflict endpoint: the same physical device changing hands moves the
+    // row to the new user rather than leaving a stale one behind.
+    const { error } = await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: userId,
+        endpoint: subscription.endpoint,
+        p256dh: json.keys?.p256dh ?? "",
+        auth: json.keys?.auth ?? "",
+      },
+      { onConflict: "endpoint" },
+    );
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 /** Ask permission, subscribe this device, save the subscription server-side. */
 export async function enablePush(
   userId: string,

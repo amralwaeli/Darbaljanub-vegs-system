@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
-import { Badge } from "./ui";
+import { Badge, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useAuth } from "../features/auth/AuthProvider";
 import { useWorkingCycle } from "../features/cycles/useCycle";
@@ -10,6 +10,7 @@ import { cycleKeys } from "../features/cycles/useCycle";
 import {
   disablePush,
   enablePush,
+  ensurePushRegistered,
   isPushEnabled,
   pushSupported,
 } from "../lib/push";
@@ -64,12 +65,97 @@ function NotificationBell() {
     <button
       onClick={() => void toggle()}
       disabled={busy}
-      className="flex h-10 w-10 items-center justify-center rounded-full text-lg active:bg-gray-100 disabled:opacity-50"
+      className="relative flex h-10 w-10 items-center justify-center rounded-full text-lg active:bg-gray-100 disabled:opacity-50"
       aria-label={t.enableNotifications}
       title={enabled ? t.notificationsOn : t.enableNotifications}
     >
       {enabled ? "🔔" : "🔕"}
+      {/* A device that receives nothing looks identical to one that does,
+          which is how everyone ended up unreachable. Make it visible. */}
+      {!enabled && (
+        <span className="absolute end-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+      )}
     </button>
+  );
+}
+
+/**
+ * Notifications are opt-in per DEVICE, and the browser will only grant them
+ * from a real tap — there is no way to switch them on for someone remotely.
+ * This card is therefore the closest thing to "on by default": every user who
+ * is not yet reachable is asked, on every screen, until they answer.
+ *
+ * It appears only when silent registration has already failed, so anyone who
+ * previously allowed notifications never sees it.
+ */
+const PUSH_PROMPT_KEY = "vegs.pushPromptSnoozedAt";
+const SNOOZE_MS = 24 * 3600_000;
+
+function NotificationPrompt() {
+  const { profile } = useAuth();
+  const toast = useToast();
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!pushSupported() || !profile) return;
+    let cancelled = false;
+
+    void (async () => {
+      // Already allowed on this device? Register it and stay silent.
+      if (await ensurePushRegistered(profile.id)) return;
+      if (cancelled) return;
+      // Blocked at OS level — the card cannot help, so don't nag.
+      if (Notification.permission === "denied") return;
+      const snoozed = Number(localStorage.getItem(PUSH_PROMPT_KEY) ?? "0");
+      if (snoozed && Date.now() - snoozed < SNOOZE_MS) return;
+      setShow(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
+
+  if (!show || !profile) return null;
+
+  function dismiss() {
+    localStorage.setItem(PUSH_PROMPT_KEY, String(Date.now()));
+    setShow(false);
+  }
+
+  async function enable() {
+    setBusy(true);
+    try {
+      const result = await enablePush(profile!.id);
+      if (result === "denied") {
+        toast.error(t.notificationsDenied);
+      } else {
+        toast.success(t.notificationsOn);
+      }
+      dismiss();
+    } catch {
+      toast.error(t.errorGeneric);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-600/20">
+      <p className="text-sm font-semibold text-brand-800">
+        🔔 {t.enableNotifications}
+      </p>
+      <p className="mt-1 text-xs text-brand-700">{t.notificationsWhy}</p>
+      <div className="mt-3 flex gap-2">
+        <Button className="flex-1" busy={busy} onClick={() => void enable()}>
+          {t.notificationsEnableNow}
+        </Button>
+        <Button variant="secondary" onClick={dismiss}>
+          {t.notificationsLater}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -147,6 +233,7 @@ export function Layout() {
       </header>
 
       <main className="scroll-pane flex-1 p-4">
+        <NotificationPrompt />
         <Outlet />
       </main>
 
