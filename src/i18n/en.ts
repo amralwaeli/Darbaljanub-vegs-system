@@ -47,6 +47,8 @@ export const en = {
   } as Record<string, string>,
   noActiveCycle: "No active order cycle",
   selectBranch: "Branch",
+  deleteRequestConfirm:
+    "Delete this branch's whole request? Every item on it is removed too.",
   readyToOrder:
     "Adjust any quantity above, then open the WhatsApp tab to send the order to your vendors. Sending closes this cycle and opens the next one.",
   noOrderYet:

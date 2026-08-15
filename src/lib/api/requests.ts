@@ -119,6 +119,12 @@ export async function deleteRequestItem(id: string): Promise<void> {
   must(true, error);
 }
 
+/** Manager/superadmin: drop a whole branch's request. Cascades to its lines. */
+export async function deleteStoreRequest(id: string): Promise<void> {
+  const { error } = await supabase.from("store_requests").delete().eq("id", id);
+  must(true, error);
+}
+
 /**
  * Aggregated manager view: same item summed across stores.
  * Grouped by item AND unit — 10 kg + 2 boxes must never silently add up.

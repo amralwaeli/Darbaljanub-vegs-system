@@ -49,6 +49,7 @@ export const ar: Strings = {
   } as Record<string, string>,
   noActiveCycle: "لا توجد دورة طلبات نشطة",
   selectBranch: "المحل",
+  deleteRequestConfirm: "حذف طلب هذا المحل بالكامل؟ ستُحذف جميع أصنافه أيضاً.",
   readyToOrder:
     "عدّل أي كمية بالأعلى، ثم افتح تبويب واتساب لإرسال الطلب إلى الموردين. الإرسال يقفل هذه الدورة ويفتح التالية.",
   noOrderYet:

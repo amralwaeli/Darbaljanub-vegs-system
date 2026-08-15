@@ -5,11 +5,14 @@ import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import {
   addRequestItem,
   aggregateRequests,
+  deleteRequestItem,
+  deleteStoreRequest,
   fetchAllRequests,
   managerRequestForStore,
   updateRequestItem,
 } from "../../lib/api/requests";
 import { ItemPickerModal } from "../requests/ItemPickerModal";
+import { ConfirmDialog } from "../../components/Modal";
 import {
   Badge,
   Button,
@@ -37,6 +40,12 @@ export default function ManagerDashboard() {
   const [tab, setTab] = useState<"stores" | "aggregated">("stores");
   /** store_id whose request the manager is adding an item to, if any. */
   const [addTarget, setAddTarget] = useState<string | null>(null);
+  /** Pending deletion, awaiting confirmation. */
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: "line"; id: string; label: string }
+    | { kind: "request"; id: string; label: string }
+    | null
+  >(null);
 
   const cycleId = cycle?.id ?? "";
   const orderInFlight = Boolean(working && working.status !== "COMPLETED");
@@ -92,6 +101,22 @@ export default function ManagerDashboard() {
     onError: onApiError,
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (target: NonNullable<typeof deleteTarget>) =>
+      target.kind === "line"
+        ? deleteRequestItem(target.id)
+        : deleteStoreRequest(target.id),
+    onSuccess: () => {
+      toast.success(t.updated);
+      setDeleteTarget(null);
+      void queryClient.invalidateQueries({ queryKey: allRequestsKey(cycleId) });
+    },
+    onError: (e) => {
+      setDeleteTarget(null);
+      onApiError(e);
+    },
+  });
+
   if (cycleLoading) return <SkeletonList />;
 
   if (!cycle) {
@@ -135,9 +160,22 @@ export default function ManagerDashboard() {
         <div className="space-y-3">
           {(requests ?? []).map((req) => (
             <Card key={req.id}>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="font-bold">{req.store.name}</span>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="flex-1 font-bold">{req.store.name}</span>
                 <Badge color="green">{req.request_items.length}</Badge>
+                <button
+                  aria-label={`${t.remove} ${req.store.name}`}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-red-400 active:bg-red-50"
+                  onClick={() =>
+                    setDeleteTarget({
+                      kind: "request",
+                      id: req.id,
+                      label: req.store.name,
+                    })
+                  }
+                >
+                  🗑
+                </button>
               </div>
               <ul className="divide-y divide-gray-50 text-sm">
                 {req.request_items.map((line) => (
@@ -167,6 +205,19 @@ export default function ManagerDashboard() {
                         }
                       }}
                     />
+                    <button
+                      aria-label={`${t.remove} ${line.item.name}`}
+                      className="flex h-10 w-8 items-center justify-center rounded-lg text-red-400 active:bg-red-50"
+                      onClick={() =>
+                        setDeleteTarget({
+                          kind: "line",
+                          id: line.id,
+                          label: line.item.name,
+                        })
+                      }
+                    >
+                      🗑
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -207,6 +258,20 @@ export default function ManagerDashboard() {
           {t.orderInFlight}
         </p>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={t.remove}
+        message={
+          deleteTarget?.kind === "request"
+            ? `${t.deleteRequestConfirm} (${deleteTarget.label})`
+            : `${t.removeItemConfirm} (${deleteTarget?.label ?? ""})`
+        }
+        danger
+        busy={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+      />
 
       <ItemPickerModal
         open={addTarget !== null}
