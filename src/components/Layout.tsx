@@ -46,7 +46,7 @@ function NotificationBell() {
         setEnabled(false);
         toast.success(t.notificationsOff);
       } else {
-        const result = await enablePush(profile!.id);
+        const result = await enablePush();
         if (result === "denied") {
           toast.error(t.notificationsDenied);
         } else {
@@ -103,7 +103,7 @@ function NotificationPrompt() {
 
     void (async () => {
       // Already allowed on this device? Register it and stay silent.
-      if (await ensurePushRegistered(profile.id)) return;
+      if (await ensurePushRegistered()) return;
       if (cancelled) return;
       // Blocked at OS level — the card cannot help, so don't nag.
       if (Notification.permission === "denied") return;
@@ -127,7 +127,7 @@ function NotificationPrompt() {
   async function enable() {
     setBusy(true);
     try {
-      const result = await enablePush(profile!.id);
+      const result = await enablePush();
       if (result === "denied") {
         toast.error(t.notificationsDenied);
       } else {

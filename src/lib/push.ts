@@ -46,7 +46,7 @@ export async function isPushEnabled(): Promise<boolean> {
  * Returns false and never throws when permission has not been granted — only
  * a real user tap can obtain it, so enablePush() handles that path.
  */
-export async function ensurePushRegistered(userId: string): Promise<boolean> {
+export async function ensurePushRegistered(): Promise<boolean> {
   try {
     if (!pushSupported() || Notification.permission !== "granted") return false;
 
@@ -60,17 +60,11 @@ export async function ensurePushRegistered(userId: string): Promise<boolean> {
     }
 
     const json = subscription.toJSON();
-    // onConflict endpoint: the same physical device changing hands moves the
-    // row to the new user rather than leaving a stale one behind.
-    const { error } = await supabase.from("push_subscriptions").upsert(
-      {
-        user_id: userId,
-        endpoint: subscription.endpoint,
-        p256dh: json.keys?.p256dh ?? "",
-        auth: json.keys?.auth ?? "",
-      },
-      { onConflict: "endpoint" },
-    );
+    const { error } = await supabase.rpc("register_push_subscription", {
+      p_endpoint: subscription.endpoint,
+      p_p256dh: json.keys?.p256dh ?? "",
+      p_auth: json.keys?.auth ?? "",
+    });
     return !error;
   } catch {
     return false;
@@ -78,9 +72,8 @@ export async function ensurePushRegistered(userId: string): Promise<boolean> {
 }
 
 /** Ask permission, subscribe this device, save the subscription server-side. */
-export async function enablePush(
-  userId: string,
-): Promise<"enabled" | "denied"> {
+/** The owner comes from the JWT server-side — the client cannot assert it. */
+export async function enablePush(): Promise<"enabled" | "denied"> {
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return "denied";
 
@@ -94,15 +87,14 @@ export async function enablePush(
   }
 
   const json = subscription.toJSON();
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: userId,
-      endpoint: subscription.endpoint,
-      p256dh: json.keys?.p256dh ?? "",
-      auth: json.keys?.auth ?? "",
-    },
-    { onConflict: "endpoint" },
-  );
+  // Via RPC, not a direct upsert: this browser's endpoint may already belong
+  // to whoever used the app here before, and RLS rightly forbids updating
+  // another user's row. See 0016 — the endpoint follows the device.
+  const { error } = await supabase.rpc("register_push_subscription", {
+    p_endpoint: subscription.endpoint,
+    p_p256dh: json.keys?.p256dh ?? "",
+    p_auth: json.keys?.auth ?? "",
+  });
   if (error) throw new Error(error.message);
   return "enabled";
 }

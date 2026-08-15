@@ -394,6 +394,10 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Database["public"]["Tables"]["order_cycles"]["Row"];
       };
+      register_push_subscription: {
+        Args: { p_endpoint: string; p_p256dh: string; p_auth: string };
+        Returns: undefined;
+      };
       manager_request_for_store: {
         Args: { p_cycle_id: string; p_store_id: string };
         Returns: Database["public"]["Tables"]["store_requests"]["Row"];

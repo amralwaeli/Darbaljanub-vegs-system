@@ -22,10 +22,13 @@ separate repository — hence this folder.
 ## Publish it (about 3 minutes, once)
 
 1. Create a **public** repo named exactly `amralwaeli.github.io`.
-2. Upload the contents of this folder (`.well-known/`, `.nojekyll`,
-   `index.html`) to the repo root, keeping the folder structure.
-3. Settings → Pages → Source: **Deploy from a branch**, branch `main`, folder
-   `/ (root)`.
+2. Upload the contents of this folder to the repo root, keeping the structure:
+   `.well-known/assetlinks.json`, `.nojekyll`, `index.html`, and
+   `.github/workflows/deploy.yml`.
+3. Settings → Pages → Source: **GitHub Actions** (the included workflow
+   publishes the directory as-is; no build step). If you prefer branch
+   deploys, choose "Deploy from a branch" → `main` → `/ (root)` instead — the
+   `.nojekyll` file is there so either source works.
 4. Wait for the deploy, then confirm the file is live:
 
    ```
