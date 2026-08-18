@@ -84,6 +84,17 @@ if (!fs.existsSync(keystoreProps)) {
   process.exit(1);
 }
 
+// A copied-but-unedited template fails deep inside Gradle with a confusing
+// "keystore password was incorrect". Catch it here instead.
+if (/CHANGE_ME/.test(fs.readFileSync(keystoreProps, "utf8"))) {
+  console.error(
+    "\nandroid/keystore.properties still contains CHANGE_ME.\n\n" +
+      "Replace both CHANGE_ME values with the keystore password\n" +
+      "(it is in twa/keystore-password.txt).\n",
+  );
+  process.exit(1);
+}
+
 if (!fs.existsSync(path.join(androidDir, "app", "google-services.json"))) {
   console.warn(
     "\nWARNING: android/app/google-services.json not found.\n" +
