@@ -71,10 +71,31 @@ Messaging is free with no message quota.
    android/app/google-services.json
    ```
 4. **Project settings** (gear) → **Service accounts** → **Generate new private
-   key**. This downloads a JSON file.
-5. Give that JSON to Supabase as one secret:
+   key**. This downloads a second JSON file.
+
+   > **The two Firebase files are not interchangeable.** Open each and check:
+   > | First lines contain | It is | It goes |
+   > |---|---|---|
+   > | `"type": "service_account"` | service account key | Supabase (step 5) |
+   > | `"project_info"` / `"client"` | `google-services.json` | `android/app/` (step 3) |
+
+5. Give the **service account** JSON to Supabase as a secret. Easiest via the
+   dashboard: **Edge Functions → Secrets → Add or replace secrets**
+   - **Name:** `FCM_SERVICE_ACCOUNT`
+   - **Value:** paste the entire file contents, braces included (the field
+     accepts multi-line JSON)
+
+   The escaped `\n` sequences inside `private_key` are expected and handled.
+
+   Or from the CLI:
    ```bash
    npx supabase secrets set FCM_SERVICE_ACCOUNT="$(cat path/to/service-account.json)"
+   ```
+
+6. **Deploy the updated function.** Setting the secret is not enough on its own
+   — the currently deployed `send-push` is the older, web-push-only version,
+   and the FCM code has to be pushed up:
+   ```bash
    npx supabase functions deploy send-push --no-verify-jwt
    ```
 
