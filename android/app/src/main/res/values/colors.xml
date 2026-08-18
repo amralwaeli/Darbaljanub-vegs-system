@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand green (Tailwind green-700) — matches theme_color in the web
+         manifest and the status bar set in src/lib/native/shell.ts. -->
+    <color name="brand_green">#15803D</color>
+</resources>

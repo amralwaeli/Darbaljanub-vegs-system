@@ -14,6 +14,8 @@
 // ============================================================================
 
 import { supabase } from "./supabase";
+import { isNative } from "./native/index";
+import { onNetworkRestored } from "./native/shell";
 
 const KEY = "vegs.offline.checks.v1";
 
@@ -54,7 +56,12 @@ let flushing = false;
 
 /** Replay every queued tick. Safe to call repeatedly. */
 export async function flushCheckQueue(): Promise<void> {
-  if (flushing || !navigator.onLine) return;
+  // navigator.onLine inside the Android WebView is frequently stale — it can
+  // report "online" on a phone with no signal. Native connectivity is driven
+  // by the Network plugin instead (see initOfflineQueue), and a genuinely
+  // failed request simply leaves the tick queued for the next attempt.
+  if (flushing) return;
+  if (!isNative && !navigator.onLine) return;
   flushing = true;
   try {
     for (const q of readQueue()) {
@@ -85,5 +92,8 @@ export function initOfflineQueue() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") void flushCheckQueue();
   });
+  // In the APK, the OS tells us the truth about connectivity. This is what
+  // actually gets a market-day tick to land once the driver regains signal.
+  void onNetworkRestored(() => void flushCheckQueue());
   void flushCheckQueue();
 }

@@ -80,15 +80,23 @@ export async function setCheck(
 export async function uploadDeliveryPhoto(
   deliveryId: string,
   file: File | Blob,
+  opts: { preOptimized?: boolean } = {},
 ): Promise<string> {
+  // The native camera already returns a correctly-oriented 1280px JPEG, so
+  // there is nothing left to shrink — and running it through canvas again
+  // would only re-encode it. The web file input has no such guarantee.
   let result;
-  try {
-    result = await compressImage(file);
-  } catch (e) {
-    throw new ApiError(
-      e instanceof ImageCompressError ? e.detail : t.photoFailed,
-      e,
-    );
+  if (opts.preOptimized) {
+    result = { blob: file, fellBack: false };
+  } else {
+    try {
+      result = await compressImage(file);
+    } catch (e) {
+      throw new ApiError(
+        e instanceof ImageCompressError ? e.detail : t.photoFailed,
+        e,
+      );
+    }
   }
 
   // Falling back means the original file is going up unshrunk; keep the

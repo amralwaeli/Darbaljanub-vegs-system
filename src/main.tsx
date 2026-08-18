@@ -7,6 +7,10 @@ import { queryClient } from "./lib/queryClient";
 import { ToastProvider } from "./components/Toast";
 import { initOfflineQueue } from "./lib/offlineQueue";
 import { LANG, IS_RTL } from "./i18n/strings";
+import { isNative } from "./lib/native/index";
+import { initNativeShell } from "./lib/native/shell";
+import { initNativePushListeners } from "./lib/native/push";
+import { checkForUpdate, markLaunchSuccessful } from "./lib/native/updater";
 import "./index.css";
 
 // Arabic (default) renders right-to-left across the whole app.
@@ -14,23 +18,57 @@ document.documentElement.lang = LANG;
 document.documentElement.dir = IS_RTL ? "rtl" : "ltr";
 
 // ---------------------------------------------------------------------------
-// Auto-update: registerType "autoUpdate" swaps in new service workers
-// silently. On top of the default launch check, we re-check for a new deploy
-// every 60s AND whenever the app regains focus — a phone that stays open all
-// day still picks up today's deploy within a minute.
+// Updates. Two platforms, two mechanisms, same promise: nobody ever reinstalls.
+//
+//   website — service worker, registerType "autoUpdate" (unchanged)
+//   APK     — OTA bundles from CI, staged and applied on next launch
+//
+// The service worker is deliberately NOT registered inside the app: Capacitor
+// already serves the bundle from local storage, and a second cache layer would
+// fight the OTA swap for control of which code actually runs.
 // ---------------------------------------------------------------------------
-registerSW({
-  immediate: true,
-  onRegisteredSW(_swUrl, registration) {
-    if (!registration) return;
-    setInterval(() => void registration.update(), 60_000);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        void registration.update();
-      }
+if (isNative) {
+  // First, before anything that can throw: cancels the rollback timer that
+  // would otherwise revert this bundle. See native/updater.ts.
+  void markLaunchSuccessful().then(() => checkForUpdate(true));
+} else {
+  registerSW({
+    immediate: true,
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) return;
+      setInterval(() => void registration.update(), 60_000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          void registration.update();
+        }
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Native shell: status bar, hardware back button, splash, notification taps.
+// Every call is a no-op on the web.
+// ---------------------------------------------------------------------------
+if (isNative) {
+  void initNativeShell();
+
+  // Tapping a notification deep-links into the app. The payload carries an
+  // app-relative path precisely so it does not depend on the website's
+  // /<repo>/ base, which the APK does not have.
+  void initNativePushListeners((path) => {
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  // A phone left open all day still picks up today's deploy: re-check
+  // whenever the app returns to the foreground (rate-limited internally).
+  void import("@capacitor/app").then(({ App: CapApp }) => {
+    void CapApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) void checkForUpdate();
     });
-  },
-});
+  });
+}
 
 initOfflineQueue();
 

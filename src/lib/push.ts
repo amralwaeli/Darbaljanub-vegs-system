@@ -1,7 +1,23 @@
-// Client side of Web Push: permission, subscription, and syncing the
-// device subscription to the push_subscriptions table (RLS: own rows only).
+// Client side of push notifications: permission, subscription, and syncing the
+// device registration to the push_subscriptions table (RLS: own rows only).
+//
+// TWO TRANSPORTS, ONE API. The website uses Web Push (VAPID) exactly as it
+// always has. The Android app uses FCM, because Web Push is delivered to
+// Chrome — whose background process OEM battery managers kill — and because
+// the Push API does not exist in Android's WebView at all.
+//
+// Everything below dispatches to native/push.ts when running in the APK; the
+// web implementations are unchanged.
 
 import { supabase } from "./supabase";
+import { isNative } from "./native/index";
+import {
+  disableNativePush,
+  enableNativePush,
+  ensureNativePushRegistered,
+  isNativePushEnabled,
+  nativePushSupported,
+} from "./native/push";
 
 // The VAPID *public* key is safe to ship in code (it identifies our push
 // sender; the private half lives only in Supabase secrets). The env var can
@@ -13,6 +29,7 @@ const VAPID_PUBLIC_KEY =
   import.meta.env.VITE_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
 
 export function pushSupported(): boolean {
+  if (isNative) return nativePushSupported();
   return (
     VAPID_PUBLIC_KEY !== "" &&
     "serviceWorker" in navigator &&
@@ -29,6 +46,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 }
 
 export async function isPushEnabled(): Promise<boolean> {
+  if (isNative) return isNativePushEnabled();
   if (!pushSupported() || Notification.permission !== "granted") return false;
   const registration = await navigator.serviceWorker.ready;
   return (await registration.pushManager.getSubscription()) !== null;
@@ -47,6 +65,7 @@ export async function isPushEnabled(): Promise<boolean> {
  * a real user tap can obtain it, so enablePush() handles that path.
  */
 export async function ensurePushRegistered(): Promise<boolean> {
+  if (isNative) return ensureNativePushRegistered();
   try {
     if (!pushSupported() || Notification.permission !== "granted") return false;
 
@@ -64,6 +83,7 @@ export async function ensurePushRegistered(): Promise<boolean> {
       p_endpoint: subscription.endpoint,
       p_p256dh: json.keys?.p256dh ?? "",
       p_auth: json.keys?.auth ?? "",
+      p_platform: "web",
     });
     return !error;
   } catch {
@@ -74,6 +94,8 @@ export async function ensurePushRegistered(): Promise<boolean> {
 /** Ask permission, subscribe this device, save the subscription server-side. */
 /** The owner comes from the JWT server-side — the client cannot assert it. */
 export async function enablePush(): Promise<"enabled" | "denied"> {
+  if (isNative) return enableNativePush();
+
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return "denied";
 
@@ -94,6 +116,7 @@ export async function enablePush(): Promise<"enabled" | "denied"> {
     p_endpoint: subscription.endpoint,
     p_p256dh: json.keys?.p256dh ?? "",
     p_auth: json.keys?.auth ?? "",
+    p_platform: "web",
   });
   if (error) throw new Error(error.message);
   return "enabled";
@@ -101,6 +124,8 @@ export async function enablePush(): Promise<"enabled" | "denied"> {
 
 /** Remove this device's subscription (server row first, then browser). */
 export async function disablePush(): Promise<void> {
+  if (isNative) return disableNativePush();
+
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
   if (subscription) {

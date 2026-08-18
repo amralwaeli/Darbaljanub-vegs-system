@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_CURRENCY?: string;
   readonly VITE_INACTIVITY_HOURS?: string;
   readonly VITE_VAPID_PUBLIC_KEY?: string;
+  /** Where the APK fetches OTA bundles from. See src/lib/native/updater.ts. */
+  readonly VITE_OTA_URL?: string;
 }
 
 interface ImportMeta {

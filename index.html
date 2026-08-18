@@ -15,10 +15,17 @@
       CSP via meta tag: GitHub Pages cannot send custom response headers.
       (frame-ancestors is not supported in meta CSP; on Vercel/Netlify the
       full header versions in vercel.json / netlify.toml apply as well.)
+
+      connect-src also allows https://amralwaeli.github.io because the NATIVE
+      app fetches its OTA update manifest (ota/latest.json) from there. Without
+      it the update check is blocked by CSP and the app silently never updates
+      again — the one failure that would defeat the whole point of the APK.
+      (The bundle .zip itself is downloaded by native code, not the WebView,
+      so it is not subject to this policy.)
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://amralwaeli.github.io; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />

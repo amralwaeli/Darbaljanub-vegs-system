@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { authStorage } from "./native/storage";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -19,6 +20,10 @@ export const supabase = createClient<Database>(url, anonKey, {
     // Invite / recovery links land with tokens in the URL hash — let the
     // client pick the session up automatically on /accept-invite.
     detectSessionInUrl: true,
+    // In the APK the session lives in native storage, which Android does not
+    // evict; on the web this is undefined and supabase-js keeps its own
+    // localStorage default. See native/storage.ts for why.
+    ...(authStorage ? { storage: authStorage } : {}),
   },
 });
 

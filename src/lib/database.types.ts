@@ -26,6 +26,8 @@ export type DeliveryStatus =
   | "LOADED"
   | "OFFLOADED"
   | "RECEIVED";
+/** Push transport for a device row (0018): browser endpoint vs FCM token. */
+export type PushPlatform = "web" | "android";
 
 export interface Database {
   public: {
@@ -340,6 +342,7 @@ export interface Database {
           endpoint: string;
           p256dh: string;
           auth: string;
+          platform: PushPlatform;
           created_at: string;
         };
         Insert: {
@@ -348,10 +351,12 @@ export interface Database {
           endpoint: string;
           p256dh: string;
           auth: string;
+          platform?: PushPlatform;
         };
         Update: {
           p256dh?: string;
           auth?: string;
+          platform?: PushPlatform;
         };
         Relationships: [];
       };
@@ -395,7 +400,13 @@ export interface Database {
         Returns: Database["public"]["Tables"]["order_cycles"]["Row"];
       };
       register_push_subscription: {
-        Args: { p_endpoint: string; p_p256dh: string; p_auth: string };
+        Args: {
+          p_endpoint: string;
+          p_p256dh: string;
+          p_auth: string;
+          /** "web" = Web Push endpoint, "android" = FCM token (0018). */
+          p_platform?: PushPlatform;
+        };
         Returns: undefined;
       };
       manager_request_for_store: {

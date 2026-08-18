@@ -8,6 +8,7 @@ import {
   recordVendorOrder,
 } from "../../lib/api/vendors";
 import { buildVendorMessage, waLink } from "../../lib/whatsapp";
+import { openExternal, needsNativeLinkHandling } from "../../lib/native/links";
 import { allRequestsKey } from "./ManagerDashboard";
 import {
   Badge,
@@ -102,7 +103,7 @@ export default function VendorOrdersPage() {
     onSuccess: () => {
       toast.success(`${t.orderSentTo} ${vendor!.name}`);
       // Open WhatsApp AFTER the snapshot is safely recorded.
-      window.open(waLink(vendor!.whatsapp_number, message), "_blank");
+      void openExternal(waLink(vendor!.whatsapp_number, message));
       setSelected(new Set());
       setVendorId("");
       void queryClient.invalidateQueries({ queryKey: vendorOrdersKey(cycleId) });
@@ -244,6 +245,21 @@ export default function VendorOrdersPage() {
                   href={waLink(order.vendor.whatsapp_number, order.message_snapshot)}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={(e) => {
+                    // In the APK, hand the link to Android so it opens the
+                    // WhatsApp app itself; the WebView cannot be relied on to
+                    // do that with target="_blank". The web keeps the plain
+                    // anchor, so middle-click and ctrl-click still work.
+                    if (needsNativeLinkHandling) {
+                      e.preventDefault();
+                      void openExternal(
+                        waLink(
+                          order.vendor.whatsapp_number,
+                          order.message_snapshot,
+                        ),
+                      );
+                    }
+                  }}
                 >
                   💬 {t.openWhatsApp}
                 </a>

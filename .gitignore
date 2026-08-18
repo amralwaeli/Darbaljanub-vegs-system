@@ -20,3 +20,14 @@ backups/
 *.local
 .DS_Store
 supabase/.temp/
+
+# Native Android (Capacitor). The android/ project IS tracked — it holds real
+# configuration (signing setup, versionCode, manifest) — but never secrets or
+# build output.
+# (google-services.json is NOT ignored: it holds no secrets and the app
+#  cannot receive notifications without it — keep it in the repo.)
+android/keystore.properties
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+# OTA bundles are build artifacts produced by CI on every deploy.
+ota/

@@ -14,6 +14,17 @@
 //   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY — from: npx web-push generate-vapid-keys
 //   VAPID_SUBJECT        — mailto:you@example.com
 //   APP_URL              — the deployed PWA URL (notification click target)
+//   FCM_SERVICE_ACCOUNT  — the Firebase service-account JSON, verbatim
+//
+// TWO TRANSPORTS (see migration 0018). Every row carries a `platform`:
+//   web     -> Web Push / VAPID, exactly as before
+//   android -> FCM HTTP v1, for the native app
+//
+// They are independent: whichever is configured gets used, and a failure in
+// one never blocks the other. Notifications stopped arriving in the old TWA
+// precisely because Web Push is delivered to CHROME, whose background process
+// Android OEM battery managers kill. FCM is delivered by Play Services
+// straight to the app, which the OS wakes.
 // ============================================================================
 
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
@@ -29,6 +40,29 @@ const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com";
 const APP_URL = Deno.env.get("APP_URL") ?? "/";
+const FCM_SERVICE_ACCOUNT = Deno.env.get("FCM_SERVICE_ACCOUNT") ?? "";
+
+interface ServiceAccount {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+}
+
+/** Parsed once at cold start; null simply means "FCM not configured". */
+const serviceAccount: ServiceAccount | null = (() => {
+  if (!FCM_SERVICE_ACCOUNT) return null;
+  try {
+    const parsed = JSON.parse(FCM_SERVICE_ACCOUNT) as ServiceAccount;
+    if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
+      console.error("FCM_SERVICE_ACCOUNT is missing required fields");
+      return null;
+    }
+    return parsed;
+  } catch (e) {
+    console.error("FCM_SERVICE_ACCOUNT is not valid JSON:", e);
+    return null;
+  }
+})();
 
 // All staff are Arabic speakers — notifications are sent in Arabic.
 // Each message is written for the ROLE that receives it (see 0010 for the
@@ -64,6 +98,140 @@ const MESSAGES = {
   }),
 } as const;
 
+// ----------------------------------------------------------- FCM plumbing --
+// FCM HTTP v1 authenticates with a short-lived OAuth token minted from the
+// service account, so we sign a JWT and exchange it. Web Crypto does the RS256
+// signing, so this adds no dependency.
+
+function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function pemToPkcs8(pem: string): Uint8Array {
+  // Service-account JSON often stores newlines escaped as \n — normalise
+  // before stripping the armour, or atob() chokes.
+  const body = pem
+    .replace(/\\n/g, "\n")
+    .replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  return Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+}
+
+// Access tokens last an hour; a warm instance reuses one rather than paying a
+// round-trip per notification.
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function fcmAccessToken(sa: ServiceAccount): Promise<string | null> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && cachedToken.expiresAt > now + 60) return cachedToken.value;
+
+  try {
+    const encoder = new TextEncoder();
+    const segment = (obj: unknown) =>
+      base64Url(encoder.encode(JSON.stringify(obj)));
+
+    const unsigned =
+      segment({ alg: "RS256", typ: "JWT" }) +
+      "." +
+      segment({
+        iss: sa.client_email,
+        scope: "https://www.googleapis.com/auth/firebase.messaging",
+        aud: "https://oauth2.googleapis.com/token",
+        iat: now,
+        exp: now + 3600,
+      });
+
+    const key = await crypto.subtle.importKey(
+      "pkcs8",
+      pemToPkcs8(sa.private_key),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const signature = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      encoder.encode(unsigned),
+    );
+
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: unsigned + "." + base64Url(new Uint8Array(signature)),
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("FCM token exchange failed:", await response.text());
+      return null;
+    }
+
+    const json = (await response.json()) as {
+      access_token: string;
+      expires_in?: number;
+    };
+    cachedToken = {
+      value: json.access_token,
+      expiresAt: now + (json.expires_in ?? 3600),
+    };
+    return cachedToken.value;
+  } catch (e) {
+    console.error("FCM token mint failed:", e);
+    return null;
+  }
+}
+
+/** "sent" | "dead" | "failed" — "dead" is the only signal that prunes a row. */
+async function sendFcm(
+  token: string,
+  accessToken: string,
+  projectId: string,
+  message: { title: string; body: string },
+): Promise<"sent" | "dead" | "failed"> {
+  const response = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          token,
+          notification: { title: message.title, body: message.body },
+          // The app reads `path` when the notification is tapped. It is
+          // app-relative on purpose: the APK has no /<repo>/ base, unlike the
+          // website, so a full URL would not route.
+          data: { url: APP_URL, path: "/" },
+          android: {
+            // Market days are time-critical; these must not be batched.
+            priority: "HIGH",
+            notification: { sound: "default", default_vibrate_timings: true },
+          },
+        },
+      }),
+    },
+  );
+
+  if (response.ok) return "sent";
+
+  const body = await response.text();
+  // A token dies when the app is uninstalled or its data cleared. Only these
+  // two signals are trusted for deletion — never a generic 400, which could be
+  // our own payload bug and would wipe every live device.
+  const unregistered = response.status === 404 || /UNREGISTERED/.test(body);
+  if (!unregistered) {
+    console.error("FCM send failed:", response.status, body.slice(0, 200));
+  }
+  return unregistered ? "dead" : "failed";
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("method not allowed", { status: 405 });
@@ -72,12 +240,15 @@ Deno.serve(async (req) => {
   if (!WEBHOOK_SECRET || req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
     return new Response("forbidden", { status: 403 });
   }
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
-    console.error("VAPID keys not configured");
+  // Either transport alone is useful; only having neither is a misconfig.
+  const webPushReady = Boolean(VAPID_PUBLIC && VAPID_PRIVATE);
+  if (!webPushReady && !serviceAccount) {
+    console.error("neither VAPID keys nor FCM_SERVICE_ACCOUNT configured");
     return new Response("not configured", { status: 500 });
   }
-
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  if (webPushReady) {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  }
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
   try {
@@ -154,7 +325,7 @@ Deno.serve(async (req) => {
     // ------------------------------------------------- load & send ---------
     const { data: subs } = await admin
       .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
+      .select("id, endpoint, p256dh, auth, platform")
       .in("user_id", userIds);
 
     const payload = JSON.stringify({
@@ -166,8 +337,34 @@ Deno.serve(async (req) => {
     let sent = 0;
     const dead: string[] = [];
 
+    // One OAuth token covers every android row in this dispatch.
+    const accessToken =
+      serviceAccount && (subs ?? []).some((row) => row.platform === "android")
+        ? await fcmAccessToken(serviceAccount)
+        : null;
+
     await Promise.all(
       (subs ?? []).map(async (sub) => {
+        // --- native app: FCM ---
+        if (sub.platform === "android") {
+          if (!accessToken || !serviceAccount) return;
+          try {
+            const result = await sendFcm(
+              sub.endpoint,
+              accessToken,
+              serviceAccount.project_id,
+              message,
+            );
+            if (result === "sent") sent++;
+            else if (result === "dead") dead.push(sub.id);
+          } catch (err) {
+            console.error("FCM send threw:", err);
+          }
+          return;
+        }
+
+        // --- website: Web Push (unchanged) ---
+        if (!webPushReady) return;
         try {
           await webpush.sendNotification(
             {

@@ -1,11 +1,16 @@
-# Darb Al-Janub Vegetables — Procurement & Distribution PWA
+# Darb Al-Janub Vegetables — Procurement & Distribution
 
 A multi-store vegetable procurement system: store PICs request items, the
 manager aggregates and orders from market vendors via WhatsApp, enters cost
 prices, and drivers load per-store deliveries with mandatory photo proof.
 
-Installable once on any phone (Android/iOS) or desktop — **auto-updates
-silently on every deploy, no reinstalls ever**.
+Ships two ways from **one codebase**:
+
+- a **native Android app** (Capacitor) that staff install **once**, and
+- a **website** for desktop and any other phone.
+
+Both **auto-update on every push to `main`** — the APK is never reinstalled
+for ordinary code changes. See [docs/NATIVE_APP.md](docs/NATIVE_APP.md).
 
 | Role | Can do |
 |---|---|
@@ -15,7 +20,8 @@ silently on every deploy, no reinstalls ever**.
 | **Driver** | Per-store delivery checklists + photo proof + "Loaded" — **never sees any price** |
 
 Stack: React + Vite + TypeScript + Tailwind · TanStack Query · Supabase
-(Postgres/Auth/Storage/Realtime/Edge Functions, free tier) · vite-plugin-pwa.
+(Postgres/Auth/Storage/Realtime/Edge Functions, free tier) · Capacitor 8
+(native Android) · vite-plugin-pwa (website).
 
 **Language**: the app is **Arabic-first (RTL)** — Arabic is the default for
 every user; a 🌐 toggle in the header/login switches to English. All text
@@ -51,15 +57,25 @@ supabase/
   config.toml           per-function JWT settings (for CLI deploys)
 src/
   lib/                  supabase client, DB types, api layer, utilities
+  lib/native/           EVERYTHING platform-specific: camera, push (FCM),
+                        session storage, OTA updater, shell, external links.
+                        Feature code never branches on the platform itself.
   features/             auth / requests (PIC) / purchasing (Manager) /
                         deliveries (Driver) / admin / cycles
   components/           shared UI (mobile-first, 48px+ touch targets)
   i18n/strings.ts       ALL user-facing text (Arabic/RTL-ready)
+android/                native Android project (Capacitor). Tracked, because
+                        it holds real config: signing setup, versionCode,
+                        manifest, icons. Secrets are NOT tracked.
 scripts/
   seed.mjs              demo users (local only, needs service-role key)
   generate-icons.ps1    regenerates public/icons/*.png
+  build-native.mjs      web build with base "/" for the APK + OTA
+  make-ota-bundle.mjs   packages dist/ as an OTA update bundle
+  build-apk.mjs         signed release APK
 docs/
   ARCHITECTURE.md       diagrams + order-cycle state machine
+  NATIVE_APP.md         the Android app: updates, Firebase, building, fixes
   TEST_CHECKLIST.md     manual test script per role + RLS verification
 ```
 
@@ -164,22 +180,48 @@ the full header-based CSP + HSTS on top of the meta tag.
 
 ## 5. How auto-update works (and staff install guide)
 
-- The service worker (`vite-plugin-pwa`, `registerType: 'autoUpdate'`)
-  precaches the app shell. On every launch, **every focus**, and every 60s,
-  it checks the server for a new build; a new deploy is downloaded in the
-  background and swapped in automatically. Nobody ever reinstalls anything.
-- Supabase API calls are **never** cached by the service worker.
+Full detail in **[docs/NATIVE_APP.md](docs/NATIVE_APP.md)**. In short, one push
+to `main` updates everything:
 
-**Android (Chrome)**: open the site → menu ⋮ → **"Add to Home screen"** /
-"Install app" → confirm. The 🥬 icon appears like a normal app.
-**iPhone (Safari)**: open the site → Share □↑ → **"Add to Home Screen"**.
-**Desktop (Chrome/Edge)**: install icon at the right of the address bar.
+| Target | Mechanism | Staff action |
+|---|---|---|
+| **Android app** | CI publishes an OTA bundle to `/<repo>/ota/`; the app checks on launch and on resume, downloads in the background, and applies on next open | **None** |
+| **Website** | Service worker (`registerType: 'autoUpdate'`), re-checked on focus and every 60s | **None** |
+
+Supabase API calls are **never** cached.
+
+A new APK is only needed for changes to the native shell itself — a new
+Capacitor plugin, a new permission, the icon or app name. Ordinary screen,
+text, and business-logic changes never require one.
+
+**Installing the app (once):** send staff
+`android/app/build/outputs/apk/release/app-release.apk` from
+`npm run android:apk`. It installs over the old TWA in place — same package
+id, same signing key — so nothing needs uninstalling. Staff sign in once more,
+because the old Chrome-held session does not carry over.
+
+**Website:** open the site in any browser. It can still be installed as a PWA
+(Android Chrome → ⋮ → "Add to Home screen"; iPhone Safari → Share → "Add to
+Home Screen"; desktop → install icon in the address bar).
 
 ## 5b. Push notifications setup (one-time, ~5 minutes)
 
 Pushes are sent by the `send-push` Edge Function, triggered directly by the
 database (pg_net). The event → role matrix is in the table above; the triggers
 live in migrations 0008 and 0010.
+
+There are **two transports**, chosen per device by the `platform` column
+(migration 0018):
+
+| Device | Transport | Setup |
+|---|---|---|
+| Native Android app | **FCM** | Firebase — see [docs/NATIVE_APP.md §3a](docs/NATIVE_APP.md) |
+| Website / desktop | **Web Push (VAPID)** | steps 1–5 below |
+
+They are independent: configure either or both. The Android app **must** use
+FCM — the Push API does not exist in Android's WebView, and Web Push in the old
+TWA was delivered to Chrome, whose background process OEM battery managers kill.
+That is why notifications used to go missing.
 
 1. **Generate VAPID keys** (once, anywhere):
    ```sh
@@ -202,6 +244,9 @@ live in migrations 0008 and 0010.
    notifications — per device.
 
 Notes:
+- **Android app**: notifications need `android/app/google-services.json` at
+  build time and the `FCM_SERVICE_ACCOUNT` secret on Supabase. Android 13+
+  prompts for permission the first time the bell is tapped.
 - **iPhone**: Web Push works only for the **installed** PWA (Add to Home
   Screen, iOS 16.4+), not in the Safari tab.
 - Notification texts are Arabic (see `supabase/functions/send-push/index.ts`).

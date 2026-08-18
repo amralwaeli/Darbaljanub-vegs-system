@@ -1,22 +1,37 @@
 # ============================================================================
-# Deploy the PWA to GitHub Pages on every push to main.
+# One push to main updates BOTH the website and every installed phone.
+#
+# The job builds the same app twice, because the two targets need different
+# base paths:
+#
+#   website  base "/<repo>/"  — GitHub Pages serves project sites from a
+#                               subdirectory.
+#   APK/OTA  base "/"         — the native WebView serves the bundle from its
+#                               own root. Shipping the website build to the app
+#                               would 404 every asset: a blank green screen.
+#
+# Both are published to the same Pages site:
+#   /<repo>/            the website
+#   /<repo>/ota/        latest.json + bundle-<version>.zip, which the installed
+#                       app polls on launch and on resume
+#
+# The APK itself is built rarely and by hand (npm run android:apk). Staff
+# install it ONCE; everything here reaches them over the air.
 #
 # One-time setup in the GitHub repo:
 #   1. Settings → Pages → Source: "GitHub Actions"
 #   2. Settings → Secrets and variables → Actions → New repository secret:
 #        VITE_SUPABASE_URL       = https://<ref>.supabase.co
 #        VITE_SUPABASE_ANON_KEY  = <anon key>          (safe: RLS protects data)
+#        VITE_VAPID_PUBLIC_KEY   = <web push public key>
 #      Optional "Variables":
 #        VITE_CURRENCY
 #        VITE_INACTIVITY_HOURS — idle hours before auto-logout. Leave the
 #          variable UNSET to keep staff signed in until they tap Logout.
 #          An unset variable expands to "", which the client reads as
 #          "disabled" (it must never be parsed as the number 0).
-#
-# Every push to main = new deploy = every installed PWA silently auto-updates
-# within about a minute of being opened/focused.
 # ============================================================================
-name: Deploy to GitHub Pages
+name: Deploy website + OTA bundle
 
 on:
   push:
@@ -45,38 +60,84 @@ jobs:
 
       # Project site (user.github.io/<repo>) needs base "/<repo>/";
       # a user/org site (<user>.github.io repo) or custom domain needs "/".
-      - name: Compute base path
-        id: base
+      - name: Compute paths
+        id: paths
         run: |
           REPO="${{ github.event.repository.name }}"
           if [[ "$REPO" == *.github.io ]]; then
-            echo "path=/" >> "$GITHUB_OUTPUT"
+            echo "base=/" >> "$GITHUB_OUTPUT"
           else
-            echo "path=/$REPO/" >> "$GITHUB_OUTPUT"
+            echo "base=/$REPO/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute OTA public URL
+        id: ota
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          if [[ "$REPO" == *.github.io ]]; then
+            echo "url=https://$REPO/ota" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=https://$OWNER.github.io/$REPO/ota" >> "$GITHUB_OUTPUT"
           fi
 
       - run: npm ci
 
-      - run: npm run build
+      # --------------------------------------------------------------------
+      # 1. The website, built with the /<repo>/ base.
+      # --------------------------------------------------------------------
+      - name: Build website
+        run: npm run build
         env:
-          BASE_PATH: ${{ steps.base.outputs.path }}
+          BASE_PATH: ${{ steps.paths.outputs.base }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
           VITE_CURRENCY: ${{ vars.VITE_CURRENCY }}
           VITE_INACTIVITY_HOURS: ${{ vars.VITE_INACTIVITY_HOURS }}
+          VITE_OTA_URL: ${{ steps.ota.outputs.url }}
 
       # GitHub Pages has no SPA rewrites: serving a copy of index.html as
       # 404.html makes deep links (/accept-invite, /delivery/<id>) load the
       # app, which then routes client-side.
-      - name: SPA fallback
-        run: cp dist/index.html dist/404.html
+      - name: Stage website
+        run: |
+          cp dist/index.html dist/404.html
+          mv dist site
+
+      # --------------------------------------------------------------------
+      # 2. The same app built for the APK (base "/"), packaged as an OTA
+      #    bundle. This is what reaches the phones.
+      # --------------------------------------------------------------------
+      - name: Build native bundle
+        run: npm run build:native
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+          VITE_CURRENCY: ${{ vars.VITE_CURRENCY }}
+          VITE_INACTIVITY_HOURS: ${{ vars.VITE_INACTIVITY_HOURS }}
+          VITE_OTA_URL: ${{ steps.ota.outputs.url }}
+
+      - name: Package OTA bundle
+        run: npm run ota:bundle
+        env:
+          # Monotonic per run, so every deploy is a distinct version the app
+          # recognises as "not what I am running".
+          OTA_BUILD: ${{ github.run_number }}
+          OTA_PUBLIC_URL: ${{ steps.ota.outputs.url }}
+
+      - name: Combine website + OTA
+        run: |
+          mv ota site/ota
+          echo "--- publishing ---"
+          ls -la site/ota
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build

@@ -22,6 +22,7 @@ import {
 import { useToast } from "../../components/Toast";
 import { fmtQty, fmtTime } from "../../lib/format";
 import { t } from "../../i18n/strings";
+import { capturePhoto, hasNativeCamera } from "../../lib/native/camera";
 
 const deliveryKey = (id: string) => ["delivery", id] as const;
 const checklistKey = (id: string) => ["checklist", id] as const;
@@ -95,8 +96,9 @@ export default function DeliveryDetailPage() {
 
   /** Both photos go through the same path — only which slot they fill differs. */
   async function onPhotoChosen(
-    file: File | undefined,
+    file: Blob | undefined,
     kind: "load" | "offload",
+    preOptimized = false,
   ) {
     if (!file || !delivery) return;
     const setBusy = kind === "load" ? setUploading : setOffloadUploading;
@@ -106,12 +108,34 @@ export default function DeliveryDetailPage() {
     setBusy(true);
     setPreview(URL.createObjectURL(file));
     try {
-      setPath(await uploadDeliveryPhoto(delivery.id, file));
+      setPath(await uploadDeliveryPhoto(delivery.id, file, { preOptimized }));
     } catch (e) {
       setPreview(null);
       onApiError(e);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Take the proof photo.
+   *
+   * In the APK this opens the real OS camera, which hands back a JPEG — the
+   * whole HEIC failure that stopped drivers completing deliveries simply
+   * cannot occur. On the web it falls back to the hidden file input.
+   */
+  async function startCapture(kind: "load" | "offload") {
+    if (!hasNativeCamera) {
+      const input = kind === "load" ? fileInputRef : offloadInputRef;
+      input.current?.click();
+      return;
+    }
+    try {
+      const photo = await capturePhoto();
+      // null = the driver backed out of the camera, which is not an error.
+      if (photo) await onPhotoChosen(photo.blob, kind, true);
+    } catch (e) {
+      onApiError(e);
     }
   }
 
@@ -263,7 +287,7 @@ export default function DeliveryDetailPage() {
               variant="secondary"
               className="w-full"
               busy={uploading}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => void startCapture("load")}
             >
               📷 {photoPreview ? t.retakePhoto : t.takePhoto}
             </Button>
@@ -315,7 +339,7 @@ export default function DeliveryDetailPage() {
             variant="secondary"
             className="w-full"
             busy={offloadUploading}
-            onClick={() => offloadInputRef.current?.click()}
+            onClick={() => void startCapture("offload")}
           >
             📷 {offloadPreview ? t.retakePhoto : t.takePhoto}
           </Button>
