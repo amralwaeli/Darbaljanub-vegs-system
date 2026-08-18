@@ -31,3 +31,7 @@ android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 # OTA bundles are build artifacts produced by CI on every deploy.
 ota/
+
+# Built APKs are 9.5 MB binaries — distribute them, never commit them.
+*.apk
+*.aab
