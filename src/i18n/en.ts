@@ -76,12 +76,21 @@ export const en = {
   requestLocked: "The cycle is locked — your request can no longer be edited.",
   sendRequest: "Send request to manager",
   sendRequestConfirm:
-    "Send this list to the manager? You will not be able to change it afterwards — the manager can adjust quantities if needed.",
+    "Send this list to the manager? You cannot edit it afterwards — but if you forget something you can still send another order.",
   requestSent: "Request sent to the manager",
   requestSentNote:
     "This request has been sent. Only the manager can change the quantities now.",
   requestDraftBadge: "Draft",
   requestSentBadge: "Sent",
+
+  // Follow-up orders (0019)
+  orderNumber: "Order",
+  additionalOrder: "Additional order",
+  startNewOrder: "Send another order",
+  startNewOrderHint:
+    "Forgot something? Send a follow-up order — the manager sees it as an addition to today's list.",
+  previousOrders: "Already sent today",
+  newOrderStarted: "New order started",
   requestEmpty: "No items yet. Add what your store needs.",
   requestNewItem: "Request new item",
   newItemName: "Item name",
@@ -159,6 +168,24 @@ export const en = {
   vendors: "Vendors",
   users: "Users",
   audit: "Audit log",
+
+  // Categories (0019)
+  categories: "Categories",
+  category: "Category",
+  uncategorized: "Uncategorized",
+  allCategories: "All categories",
+  addCategory: "Add category",
+  categoryName: "Category name",
+  categoryEmoji: "Emoji (optional)",
+  categorySortOrder: "Display order",
+  noCategory: "No category",
+  chooseCategoryItems: "Choose items",
+  categoryItemsTitle: "Items in this category",
+  categoryItemsSaved: "Items updated",
+  categoryEmpty: "No categories yet.",
+  filterByCategory: "Category",
+  noItemsInCategory: "Nothing in this category yet.",
+  vendorCategory: "Supplies category",
   addStore: "Add store",
   storeName: "Store name",
   storeAddress: "Address / location note",

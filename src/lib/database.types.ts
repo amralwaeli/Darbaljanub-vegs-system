@@ -96,6 +96,8 @@ export interface Database {
           emoji: string | null;
           is_active: boolean;
           is_approved: boolean;
+          /** 0019. NULL = not yet filed under a category. */
+          category_id: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -107,6 +109,7 @@ export interface Database {
           emoji?: string | null;
           is_active?: boolean;
           is_approved?: boolean;
+          category_id?: string | null;
           created_by?: string | null;
         };
         Update: {
@@ -115,6 +118,7 @@ export interface Database {
           emoji?: string | null;
           is_active?: boolean;
           is_approved?: boolean;
+          category_id?: string | null;
         };
         Relationships: [];
       };
@@ -125,6 +129,8 @@ export interface Database {
           whatsapp_number: string;
           notes: string | null;
           is_active: boolean;
+          /** 0019. The single category this vendor supplies. */
+          category_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -134,11 +140,39 @@ export interface Database {
           whatsapp_number: string;
           notes?: string | null;
           is_active?: boolean;
+          category_id?: string | null;
         };
         Update: {
           name?: string;
           whatsapp_number?: string;
           notes?: string | null;
+          is_active?: boolean;
+          category_id?: string | null;
+        };
+        Relationships: [];
+      };
+
+      categories: {
+        Row: {
+          id: string;
+          name: string;
+          emoji: string | null;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          emoji?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Update: {
+          name?: string;
+          emoji?: string | null;
+          sort_order?: number;
           is_active?: boolean;
         };
         Relationships: [];
@@ -170,6 +204,12 @@ export interface Database {
           cycle_id: string;
           store_id: string;
           status: RequestStatus;
+          /**
+           * Which send this was for this branch in this cycle: 1, 2, 3...
+           * Assigned by a BEFORE INSERT trigger (0019); the client never sets
+           * it and it can never be changed afterwards.
+           */
+          seq: number;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -407,6 +447,14 @@ export interface Database {
           /** "web" = Web Push endpoint, "android" = FCM token (0018). */
           p_platform?: PushPlatform;
         };
+        Returns: undefined;
+      };
+      ensure_store_draft: {
+        Args: { p_cycle_id: string; p_store_id: string };
+        Returns: Database["public"]["Tables"]["store_requests"]["Row"];
+      };
+      set_category_items: {
+        Args: { p_category_id: string; p_item_ids: string[] };
         Returns: undefined;
       };
       manager_request_for_store: {

@@ -5,6 +5,7 @@ import {
   fetchVendors,
   updateVendor,
 } from "../../lib/api/vendors";
+import { fetchCategories } from "../../lib/api/categories";
 import { Modal } from "../../components/Modal";
 import {
   Badge,
@@ -12,6 +13,7 @@ import {
   Card,
   EmptyState,
   Input,
+  Select,
   SkeletonList,
 } from "../../components/ui";
 import { useToast } from "../../components/Toast";
@@ -26,10 +28,17 @@ export function VendorsAdmin() {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [notes, setNotes] = useState("");
+  // One category per vendor (0019): the manager buys a category from a vendor.
+  const [categoryId, setCategoryId] = useState<string>("");
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["vendors"],
     queryFn: fetchVendors,
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
   });
 
   const onApiError = (e: unknown) =>
@@ -41,6 +50,7 @@ export function VendorsAdmin() {
         name: name.trim(),
         whatsapp_number: number.replace(/\D/g, ""),
         notes: notes.trim() || null,
+        category_id: categoryId || null,
       };
       if (editing === "new") return createVendor(input);
       return updateVendor(editing!.id, input);
@@ -68,6 +78,7 @@ export function VendorsAdmin() {
     setName(vendor === "new" ? "" : vendor.name);
     setNumber(vendor === "new" ? "" : vendor.whatsapp_number);
     setNotes(vendor === "new" ? "" : (vendor.notes ?? ""));
+    setCategoryId(vendor === "new" ? "" : (vendor.category_id ?? ""));
   }
 
   if (isLoading) return <SkeletonList />;
@@ -88,6 +99,11 @@ export function VendorsAdmin() {
                 <div className="text-xs text-gray-400">
                   📱 {vendor.whatsapp_number}
                   {vendor.notes ? ` · ${vendor.notes}` : ""}
+                </div>
+                <div className="text-xs text-gray-400">
+                  🗂️{" "}
+                  {(categories ?? []).find((c) => c.id === vendor.category_id)
+                    ?.name ?? t.uncategorized}
                 </div>
               </div>
               <Button variant="ghost" onClick={() => openEditor(vendor)}>
@@ -122,6 +138,19 @@ export function VendorsAdmin() {
             value={number}
             onChange={(e) => setNumber(e.target.value)}
           />
+          <Select
+            label={t.vendorCategory}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">{t.noCategory}</option>
+            {(categories ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.emoji ? `${category.emoji} ` : ""}
+                {category.name}
+              </option>
+            ))}
+          </Select>
           <Input
             label={t.notes}
             maxLength={300}

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createItem, fetchAllItems, updateItem } from "../../lib/api/items";
+import { fetchCategories } from "../../lib/api/categories";
 import { Modal } from "../../components/Modal";
 import {
   Badge,
   Button,
   Card,
   Input,
+  Select,
   SkeletonList,
 } from "../../components/ui";
 import { useToast } from "../../components/Toast";
@@ -20,10 +22,17 @@ export function ItemsAdmin() {
   const [editing, setEditing] = useState<Item | "new" | null>(null);
   const [name, setName] = useState("");
   const [unit, setUnit] = useState<string>("kg");
+  const [categoryId, setCategoryId] = useState<string>("");
 
   const { data: items, isLoading } = useQuery({
     queryKey: ["items", "all"],
     queryFn: fetchAllItems,
+  });
+
+  // Categories (0019) so an item can be filed as it is created or renamed.
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
   });
 
   const invalidate = () => {
@@ -40,11 +49,13 @@ export function ItemsAdmin() {
         return createItem({
           name,
           default_unit: unit,
+          category_id: categoryId || null,
         });
       }
       return updateItem(editing!.id, {
         name: name.trim(),
         default_unit: unit,
+        category_id: categoryId || null,
       });
     },
     onSuccess: () => {
@@ -69,6 +80,7 @@ export function ItemsAdmin() {
     setEditing(item);
     setName(item === "new" ? "" : item.name);
     setUnit(item === "new" ? "kg" : item.default_unit);
+    setCategoryId(item === "new" ? "" : (item.category_id ?? ""));
   }
 
   if (isLoading) return <SkeletonList />;
@@ -124,6 +136,19 @@ export function ItemsAdmin() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+          <Select
+            label={t.category}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">{t.noCategory}</option>
+            {(categories ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.emoji ? `${category.emoji} ` : ""}
+                {category.name}
+              </option>
+            ))}
+          </Select>
           {/* No unit field and no icon field: the catalogue is name-only, and
               every list shows a name and a number. `unit` is still carried on
               the row (defaulting to kg) because delivery and vendor records

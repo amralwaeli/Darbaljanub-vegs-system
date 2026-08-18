@@ -46,6 +46,7 @@ export async function createItem(input: {
   name: string;
   default_unit: string;
   emoji?: string | null;
+  category_id?: string | null;
 }): Promise<Item> {
   const { data, error } = await supabase
     .from("items")
@@ -57,7 +58,12 @@ export async function createItem(input: {
 
 export async function updateItem(
   id: string,
-  patch: Partial<Pick<Item, "name" | "default_unit" | "emoji" | "is_active" | "is_approved">>,
+  patch: Partial<
+    Pick<
+      Item,
+      "name" | "default_unit" | "emoji" | "is_active" | "is_approved" | "category_id"
+    >
+  >,
 ): Promise<Item> {
   const { data, error } = await supabase
     .from("items")

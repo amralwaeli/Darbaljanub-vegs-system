@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
-import { fetchStoreRequest, updateRequestItem } from "../../lib/api/requests";
+import {
+  fetchStoreRequests,
+  updateRequestItem,
+} from "../../lib/api/requests";
 import {
   fetchDeliveries,
   getPhotoUrl,
@@ -40,9 +43,9 @@ export default function PicPricingPage() {
   const costsReady =
     cycle && ["PURCHASED", "IN_DELIVERY", "COMPLETED"].includes(cycle.status);
 
-  const { data: request, isLoading } = useQuery({
+  const { data: requests, isLoading } = useQuery({
     queryKey: priceKey(cycleId, storeId),
-    queryFn: () => fetchStoreRequest(cycleId, storeId),
+    queryFn: () => fetchStoreRequests(cycleId, storeId),
     enabled: Boolean(cycleId && storeId && costsReady),
   });
 
@@ -103,7 +106,9 @@ export default function PicPricingPage() {
     );
   }
 
-  const lines = request?.request_items ?? [];
+  // Flattened across every order the branch sent this cycle (0019): pricing
+  // is per line, and which send a line arrived on does not matter here.
+  const lines = (requests ?? []).flatMap((r) => r.request_items);
   const total = lines.reduce((sum, l) => sum + (l.line_total ?? 0), 0);
 
   return (

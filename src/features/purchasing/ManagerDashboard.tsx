@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOpenCycle, useWorkingCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
@@ -8,9 +8,11 @@ import {
   deleteRequestItem,
   deleteStoreRequest,
   fetchAllRequests,
+  groupByCategory,
   managerRequestForStore,
   updateRequestItem,
 } from "../../lib/api/requests";
+import { fetchCategories } from "../../lib/api/categories";
 import { ItemPickerModal } from "../requests/ItemPickerModal";
 import { ConfirmDialog } from "../../components/Modal";
 import {
@@ -19,6 +21,7 @@ import {
   Card,
   EmptyState,
   PageTitle,
+  Select,
   SkeletonList,
 } from "../../components/ui";
 import type { Item } from "../../lib/types";
@@ -30,6 +33,13 @@ import { t } from "../../i18n/strings";
 export const allRequestsKey = (cycleId: string) =>
   ["requests", "all", cycleId] as const;
 
+/**
+ * Filter value for "not in any category". Needed as its own option: without
+ * it there is no way to pull up the items nobody has filed yet, which is
+ * exactly the list the manager needs in order to go and file them.
+ */
+const UNFILED = "__unfiled__";
+
 export default function ManagerDashboard() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -38,6 +48,8 @@ export default function ManagerDashboard() {
   const { data: cycle, isLoading: cycleLoading } = useOpenCycle();
   const { data: working } = useWorkingCycle();
   const [tab, setTab] = useState<"stores" | "aggregated">("stores");
+  /** "" = every category. Narrows both tabs to one category at a time (0019). */
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   /** store_id whose request the manager is adding an item to, if any. */
   const [addTarget, setAddTarget] = useState<string | null>(null);
   /** Pending deletion, awaiting confirmation. */
@@ -54,6 +66,11 @@ export default function ManagerDashboard() {
     queryKey: allRequestsKey(cycleId),
     queryFn: () => fetchAllRequests(cycleId),
     enabled: Boolean(cycleId),
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
   });
 
   // New PIC submissions appear live.
@@ -128,7 +145,37 @@ export default function ManagerDashboard() {
     );
   }
 
-  const aggregated = aggregateRequests(requests ?? []);
+  // Narrow to one category by dropping lines that are not in it, then drop
+  // any order left with nothing — an empty card would just be noise.
+  const visibleRequests = useMemo(() => {
+    if (!categoryFilter) return requests ?? [];
+    const activeIds = new Set((categories ?? []).map((c) => c.id));
+    const matches = (categoryId: string | null) =>
+      categoryFilter === UNFILED
+        ? // A deactivated category reads as unfiled here, matching how the
+          // aggregated tab groups it.
+          !categoryId || !activeIds.has(categoryId)
+        : categoryId === categoryFilter;
+
+    return (requests ?? [])
+      .map((req) => ({
+        ...req,
+        request_items: req.request_items.filter((line) =>
+          matches(line.item.category_id),
+        ),
+      }))
+      .filter((req) => req.request_items.length > 0);
+  }, [requests, categoryFilter, categories]);
+
+  const aggregated = aggregateRequests(visibleRequests);
+
+  // The aggregated tab reads category by category, which is the order the
+  // manager buys in: one category, one vendor.
+  const aggregatedGroups = groupByCategory(
+    aggregated,
+    categories ?? [],
+    (line) => line.category_id,
+  );
 
   return (
     <>
@@ -152,16 +199,53 @@ export default function ManagerDashboard() {
         ))}
       </div>
 
+      {(categories ?? []).length > 0 && (
+        <Select
+          className="mb-3"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+        >
+          <option value="">{t.allCategories}</option>
+          {(categories ?? []).map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.emoji ? `${category.emoji} ` : ""}
+              {category.name}
+            </option>
+          ))}
+          <option value={UNFILED}>{t.uncategorized}</option>
+        </Select>
+      )}
+
       {isLoading ? (
         <SkeletonList />
-      ) : (requests ?? []).length === 0 ? (
-        <EmptyState emoji="📭" message={t.noRequestsYet} />
+      ) : visibleRequests.length === 0 ? (
+        // Distinguish "nobody has ordered" from "nothing in THIS category" —
+        // the same empty screen for both reads as if the branches sent nothing.
+        <EmptyState
+          emoji="📭"
+          message={
+            (requests ?? []).length > 0 && categoryFilter
+              ? t.noItemsInCategory
+              : t.noRequestsYet
+          }
+        />
       ) : tab === "stores" ? (
         <div className="space-y-3">
-          {(requests ?? []).map((req) => (
+          {visibleRequests.map((req) => (
             <Card key={req.id}>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="flex-1 font-bold">{req.store.name}</span>
+                <span className="flex-1 font-bold">
+                  {req.store.name}
+                  {/* A branch may send follow-up orders (0019). Anything after
+                      the first is labelled so the manager can see at a glance
+                      that it arrived late rather than being part of the
+                      original list. */}
+                  {req.seq > 1 && (
+                    <span className="ms-2 rounded-lg bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                      {t.additionalOrder} · {t.orderNumber} {req.seq}
+                    </span>
+                  )}
+                </span>
                 <Badge color="green">{req.request_items.length}</Badge>
                 <button
                   aria-label={`${t.remove} ${req.store.name}`}
@@ -234,21 +318,36 @@ export default function ManagerDashboard() {
           ))}
         </div>
       ) : (
-        <div className="space-y-2">
-          {aggregated.map((agg) => (
-            <Card key={`${agg.item_id}|${agg.unit}`}>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">{agg.name}</span>
-                <span className="text-lg font-bold text-brand-700">
-                  {fmtQty(agg.total_qty)}
+        <div className="space-y-4">
+          {aggregatedGroups.map((group) => (
+            <section key={group.category?.id ?? "unfiled"}>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-600">
+                <span>
+                  {group.category?.emoji ? `${group.category.emoji} ` : "🗂️ "}
+                  {group.category?.name ?? t.uncategorized}
                 </span>
+                <span className="text-xs font-normal text-gray-400">
+                  {group.lines.length}
+                </span>
+              </h2>
+              <div className="space-y-2">
+                {group.lines.map((agg) => (
+                  <Card key={`${agg.item_id}|${agg.unit}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{agg.name}</span>
+                      <span className="text-lg font-bold text-brand-700">
+                        {fmtQty(agg.total_qty)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {agg.perStore
+                        .map((s) => `${s.store_name}: ${fmtQty(s.qty)}`)
+                        .join(" · ")}
+                    </p>
+                  </Card>
+                ))}
               </div>
-              <p className="mt-1 text-xs text-gray-400">
-                {agg.perStore
-                  .map((s) => `${s.store_name}: ${fmtQty(s.qty)}`)
-                  .join(" · ")}
-              </p>
-            </Card>
+            </section>
           ))}
         </div>
       )}

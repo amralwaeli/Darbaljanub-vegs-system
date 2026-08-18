@@ -15,6 +15,7 @@ export async function createVendor(input: {
   name: string;
   whatsapp_number: string;
   notes?: string | null;
+  category_id?: string | null;
 }): Promise<Vendor> {
   const { data, error } = await supabase
     .from("vendors")
@@ -26,7 +27,9 @@ export async function createVendor(input: {
 
 export async function updateVendor(
   id: string,
-  patch: Partial<Pick<Vendor, "name" | "whatsapp_number" | "notes" | "is_active">>,
+  patch: Partial<
+    Pick<Vendor, "name" | "whatsapp_number" | "notes" | "is_active" | "category_id">
+  >,
 ): Promise<Vendor> {
   const { data, error } = await supabase
     .from("vendors")

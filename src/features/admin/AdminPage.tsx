@@ -4,11 +4,18 @@ import { PageTitle } from "../../components/ui";
 import { StoresAdmin } from "./StoresAdmin";
 import { ItemsAdmin } from "./ItemsAdmin";
 import { VendorsAdmin } from "./VendorsAdmin";
+import { CategoriesAdmin } from "./CategoriesAdmin";
 import { UsersAdmin } from "./UsersAdmin";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { t } from "../../i18n/strings";
 
-type TabKey = "stores" | "items" | "vendors" | "users" | "audit";
+type TabKey =
+  | "stores"
+  | "items"
+  | "categories"
+  | "vendors"
+  | "users"
+  | "audit";
 
 export default function AdminPage() {
   const { profile } = useAuth();
@@ -17,6 +24,7 @@ export default function AdminPage() {
   const tabs: { key: TabKey; label: string }[] = [
     { key: "stores", label: t.stores },
     { key: "items", label: t.items },
+    { key: "categories", label: t.categories },
     { key: "vendors", label: t.vendors },
     { key: "users", label: t.users },
     // Audit trail is superadmin-only (RLS enforces it regardless).
@@ -46,6 +54,7 @@ export default function AdminPage() {
 
       {tab === "stores" && <StoresAdmin />}
       {tab === "items" && <ItemsAdmin />}
+      {tab === "categories" && <CategoriesAdmin />}
       {tab === "vendors" && <VendorsAdmin />}
       {tab === "users" && <UsersAdmin />}
       {tab === "audit" && <AuditLogViewer />}

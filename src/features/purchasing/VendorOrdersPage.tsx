@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOrderingCycle, cycleKeys } from "../cycles/useCycle";
 import { fetchAllRequests } from "../../lib/api/requests";
+import { fetchCategories } from "../../lib/api/categories";
 import {
   fetchVendorOrders,
   fetchVendors,
@@ -36,6 +37,12 @@ export default function VendorOrdersPage() {
   // Orders are placed one branch at a time (0013): the vendor delivers to each
   // shop, so mixing two shops into one message would be undeliverable.
   const [storeId, setStoreId] = useState("");
+  /**
+   * "" = every category. Picking one narrows BOTH the lines below and the
+   * vendor list, because that is the whole point of filing vendors under a
+   * category (0019): one category, one vendor, one message.
+   */
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   const cycleId = cycle?.id ?? "";
   // OPEN is included: sending the first order is what locks the cycle, so the
@@ -53,18 +60,47 @@ export default function VendorOrdersPage() {
     queryFn: fetchVendors,
     enabled: Boolean(ready),
   });
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    enabled: Boolean(ready),
+  });
   const { data: sentOrders } = useQuery({
     queryKey: vendorOrdersKey(cycleId),
     queryFn: () => fetchVendorOrders(cycleId),
     enabled: Boolean(cycleId && ready),
   });
 
-  const activeVendors = (vendors ?? []).filter((v) => v.is_active);
+  // Vendors for the chosen category, or all of them when no category is
+  // chosen. A vendor with no category set stays visible either way, so an
+  // unfiled vendor can never become unreachable.
+  const activeVendors = (vendors ?? [])
+    .filter((v) => v.is_active)
+    .filter(
+      (v) =>
+        !categoryFilter ||
+        v.category_id === categoryFilter ||
+        v.category_id === null,
+    );
   const vendor = activeVendors.find((v) => v.id === vendorId) ?? null;
 
-  const branches = (requests ?? []).map((r) => r.store);
-  const request = (requests ?? []).find((r) => r.store_id === storeId) ?? null;
-  const lines = request?.request_items ?? [];
+  // One entry per branch: a branch may have sent several orders this cycle
+  // (0019), and they are all being bought at once.
+  const branches = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const req of requests ?? []) map.set(req.store_id, req.store);
+    return [...map.values()];
+  }, [requests]);
+
+  const storeRequests = (requests ?? []).filter((r) => r.store_id === storeId);
+  const storeName = storeRequests[0]?.store.name ?? "";
+  // Every line the branch asked for, across all of its orders.
+  const lines = storeRequests
+    .flatMap((r) => r.request_items)
+    .filter(
+      (line) =>
+        !categoryFilter || (line.item.category_id ?? "") === categoryFilter,
+    );
 
   // Default to the first branch, and drop a selection that no longer exists.
   useEffect(() => {
@@ -74,9 +110,9 @@ export default function VendorOrdersPage() {
 
   const chosenLines = lines.filter((l) => selected.has(l.id));
   const message =
-    request && chosenLines.length > 0
+    storeName && chosenLines.length > 0
       ? buildVendorMessage(
-          request.store.name,
+          storeName,
           chosenLines.map((l) => ({
             name: l.item.name,
             qty: Number(l.requested_qty),
@@ -160,6 +196,31 @@ export default function VendorOrdersPage() {
               </option>
             ))}
           </Select>
+
+          {/* Narrowing to one category is what makes this screen quick: the
+              lines below and the vendor list below them both shrink to the
+              one category being bought (0019). */}
+          {(categories ?? []).length > 0 && (
+            <Select
+              label={t.filterByCategory}
+              className="mb-3"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                // Ticks and the chosen vendor belong to the old category.
+                setSelected(new Set());
+                setVendorId("");
+              }}
+            >
+              <option value="">{t.allCategories}</option>
+              {(categories ?? []).map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.emoji ? `${category.emoji} ` : ""}
+                  {category.name}
+                </option>
+              ))}
+            </Select>
+          )}
 
           <div className="space-y-2">
             {lines.map((line) => {
