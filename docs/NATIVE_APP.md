@@ -139,6 +139,11 @@ android/app/build/outputs/apk/release/app-release.apk
 
 Send that file to staff. They install it once, over the existing app.
 
+**Minimum Android version: 7.0 (API 24).** The old TWA allowed 5.0. Anyone on
+Android 5.x or 6.x cannot install this APK — they are not stranded, because the
+old app still points at the website, which keeps auto-updating; they simply keep
+the browser-based experience until the phone is replaced.
+
 **JDK note:** Gradle cannot use JDK 22+. The script auto-detects a JDK 17–21
 (Android Studio ships one); set `CAPACITOR_JAVA_HOME` to override.
 

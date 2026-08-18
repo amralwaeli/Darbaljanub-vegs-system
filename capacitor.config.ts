@@ -15,13 +15,10 @@ const config: CapacitorConfig = {
   appName: "درب الجنوب",
   webDir: "dist",
 
-  android: {
-    // Release APKs are signed from android/keystore.properties (gitignored).
-    buildOptions: {
-      keystorePath: "../twa/android.keystore",
-      keystoreAlias: "android",
-    },
-  },
+  // NOTE: release signing is NOT configured here. It lives in
+  // android/keystore.properties (gitignored) and is read by
+  // android/app/build.gradle. Keeping it in one place avoids two sources of
+  // truth for the key that every future update depends on.
 
   plugins: {
     // --- OTA updates -------------------------------------------------------

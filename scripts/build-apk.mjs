@@ -122,7 +122,10 @@ console.log("\n[2/3] Syncing native project...");
 run("npx", ["cap", "sync", "android"]);
 
 console.log("\n[3/3] Assembling release APK...");
-run(isWindows ? "gradlew.bat" : "./gradlew", ["assembleRelease"], androidDir);
+// Absolute + quoted: the project path contains a space, and a bare
+// "gradlew.bat" does not resolve when the spawning shell is not cmd.exe.
+const gradlew = path.join(androidDir, isWindows ? "gradlew.bat" : "gradlew");
+run(JSON.stringify(gradlew), ["assembleRelease"], androidDir);
 
 const apk = path.join(
   androidDir,
