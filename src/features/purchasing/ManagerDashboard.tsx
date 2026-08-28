@@ -134,17 +134,6 @@ export default function ManagerDashboard() {
     },
   });
 
-  if (cycleLoading) return <SkeletonList />;
-
-  if (!cycle) {
-    return (
-      <>
-        <PageTitle>{t.requestsTitle}</PageTitle>
-        <EmptyState emoji="🌅" message={t.noActiveCycle} />
-      </>
-    );
-  }
-
   // Narrow to one category by dropping lines that are not in it, then drop
   // any order left with nothing — an empty card would just be noise.
   const visibleRequests = useMemo(() => {
@@ -166,6 +155,20 @@ export default function ManagerDashboard() {
       }))
       .filter((req) => req.request_items.length > 0);
   }, [requests, categoryFilter, categories]);
+
+  // Hooks are all above this line on purpose: every early return below
+  // must come after them, or a render that bails out early runs fewer hooks
+  // than the next one and React tears the whole tree down (blank screen).
+  if (cycleLoading) return <SkeletonList />;
+
+  if (!cycle) {
+    return (
+      <>
+        <PageTitle>{t.requestsTitle}</PageTitle>
+        <EmptyState emoji="🌅" message={t.noActiveCycle} />
+      </>
+    );
+  }
 
   const aggregated = aggregateRequests(visibleRequests);
 
