@@ -23,9 +23,48 @@ function pushPlugin(): Promise<PushModule> {
   return modulePromise;
 }
 
-/** Resolves with the FCM token once Android hands one over. */
-let tokenPromise: Promise<string> | null = null;
-let listenersReady = false;
+// ---------------------------------------------------------------- token ----
+// The FCM token arrives asynchronously, on a listener. Three things went
+// wrong with the previous shape and between them they are why staff had
+// notifications switched on and still heard nothing:
+//
+//  1. `tokenPromise` was created INSIDE initNativePushListeners, after an
+//     `await import()`. A bell tap that beat that import found it still null,
+//     and `await null` yields null — reported to the user as "denied" even
+//     though Android had just granted the permission. The OS permission stuck,
+//     so every later launch showed the bell as ON while no token was ever
+//     saved. Exactly one device in ten would register, at random.
+//  2. Nothing ever settled the promise if registration failed or Play Services
+//     stayed quiet, so the bell span forever and the enable-notifications card
+//     never appeared.
+//  3. It resolved once, for all time. A token rotation had nobody listening.
+//
+// So: waiters are a list, every path settles them, and there is always a
+// timeout. Created at module load, so there is no window to lose.
+let lastToken: string | null = null;
+const waiters: ((token: string | null) => void)[] = [];
+
+function deliverToken(token: string | null): void {
+  if (token) lastToken = token;
+  while (waiters.length > 0) waiters.shift()!(token);
+}
+
+/** The FCM token, or null if Android does not produce one in time. */
+function awaitToken(timeoutMs = 15_000): Promise<string | null> {
+  if (lastToken) return Promise.resolve(lastToken);
+  return new Promise((resolve) => {
+    const handler = (token: string | null) => {
+      clearTimeout(timer);
+      resolve(token);
+    };
+    const timer = setTimeout(() => {
+      const index = waiters.indexOf(handler);
+      if (index >= 0) waiters.splice(index, 1);
+      resolve(null);
+    }, timeoutMs);
+    waiters.push(handler);
+  });
+}
 
 /** Persist a token against the signed-in user. Safe to call repeatedly. */
 async function saveToken(token: string): Promise<boolean> {
@@ -40,32 +79,40 @@ async function saveToken(token: string): Promise<boolean> {
 }
 
 /**
- * Attach the permanent listeners. Called once per app launch.
+ * Does the server actually have THIS device against THIS user?
  *
- * The `registration` listener is deliberately PERMANENT rather than one-shot:
- * Android rotates FCM tokens on its own schedule (app data cleared, restore to
- * a new phone, Play Services refresh). Re-saving on every fire is what keeps a
- * device reachable long-term instead of going quietly dark.
- *
- * `onOpenUrl` receives the deep link from a tapped notification.
+ * RLS scopes the read to the caller's own rows, so a device that has changed
+ * hands correctly reads as "not registered" and gets re-claimed.
  */
-export async function initNativePushListeners(
-  onOpenUrl: (url: string) => void,
-): Promise<void> {
-  if (!isNative || listenersReady) return;
-  listenersReady = true;
+async function hasServerRow(token: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .select("id")
+    .eq("endpoint", token)
+    .maybeSingle();
+  return !error && Boolean(data);
+}
 
+// -------------------------------------------------------------- listeners --
+let listenersPromise: Promise<void> | null = null;
+let openUrlHandler: ((url: string) => void) | null = null;
+
+async function attachListeners(): Promise<void> {
   const { PushNotifications } = await pushPlugin();
 
-  tokenPromise = new Promise<string>((resolve) => {
-    void PushNotifications.addListener("registration", (token) => {
-      resolve(token.value);
-      void saveToken(token.value);
-    });
+  // PERMANENT, not one-shot: Android rotates FCM tokens on its own schedule
+  // (app data cleared, restore to a new phone, Play Services refresh).
+  // Re-saving on every fire is what keeps a device reachable long-term.
+  await PushNotifications.addListener("registration", (token) => {
+    deliverToken(token.value);
+    void saveToken(token.value);
   });
 
   await PushNotifications.addListener("registrationError", (err) => {
     console.error("[push] FCM registration error", JSON.stringify(err));
+    // Settle the waiters: a caller blocked on the token must fail fast, not
+    // hang behind a spinner that never stops.
+    deliverToken(null);
   });
 
   // Tapping a notification while the app is backgrounded or closed.
@@ -73,9 +120,27 @@ export async function initNativePushListeners(
     "pushNotificationActionPerformed",
     (action) => {
       const url = action.notification.data?.url;
-      if (typeof url === "string" && url) onOpenUrl(url);
+      if (typeof url === "string" && url) openUrlHandler?.(url);
     },
   );
+}
+
+/** Idempotent: every entry point awaits this before calling register(). */
+function ensureListeners(): Promise<void> {
+  listenersPromise ??= attachListeners();
+  return listenersPromise;
+}
+
+/**
+ * Attach the permanent listeners and remember where a tapped notification
+ * should navigate. Called once per app launch from main.tsx.
+ */
+export async function initNativePushListeners(
+  onOpenUrl: (url: string) => void,
+): Promise<void> {
+  if (!isNative) return;
+  openUrlHandler = onOpenUrl;
+  await ensureListeners();
 }
 
 /** Notifications are always available in the APK — Play Services handles it. */
@@ -86,7 +151,16 @@ export function nativePushSupported(): boolean {
 export async function isNativePushEnabled(): Promise<boolean> {
   if (!isNative) return false;
   const { PushNotifications } = await pushPlugin();
-  return (await PushNotifications.checkPermissions()).receive === "granted";
+  if ((await PushNotifications.checkPermissions()).receive !== "granted") {
+    return false;
+  }
+  // Permission is NOT reachability. The bell used to answer this question
+  // with the OS permission alone, so a phone that had been granted permission
+  // but never got a row into push_subscriptions displayed a confident 🔔 and
+  // received nothing, forever. Ask the server whether it can actually reach
+  // this device — that is what "enabled" means to the person reading it.
+  const token = lastToken ?? (await awaitToken(4_000));
+  return token ? await hasServerRow(token) : false;
 }
 
 /**
@@ -96,11 +170,22 @@ export async function isNativePushEnabled(): Promise<boolean> {
  */
 export async function ensureNativePushRegistered(): Promise<boolean> {
   try {
-    if (!(await isNativePushEnabled())) return false;
+    if (!isNative) return false;
     const { PushNotifications } = await pushPlugin();
+    if ((await PushNotifications.checkPermissions()).receive !== "granted") {
+      return false;
+    }
+
+    // Listeners first, always: register() is what makes Android emit the
+    // token, and nothing is listening until this resolves.
+    await ensureListeners();
     await PushNotifications.register();
-    // The listener persists the token; awaiting it just reports success.
-    return Boolean(await tokenPromise);
+
+    const token = await awaitToken();
+    if (!token) return false;
+    // The listener already saved it; this is the self-heal for a row that was
+    // pruned after a failed send, or claimed by whoever used this phone last.
+    return (await hasServerRow(token)) || (await saveToken(token));
   } catch (e) {
     console.error("[push] ensure failed", e);
     return false;
@@ -117,9 +202,18 @@ export async function enableNativePush(): Promise<"enabled" | "denied"> {
   }
   if (status.receive !== "granted") return "denied";
 
+  await ensureListeners();
   await PushNotifications.register();
-  const token = await tokenPromise;
-  if (!token) return "denied";
+
+  const token = await awaitToken();
+  // Reaching here with no token means Android granted the permission and then
+  // failed to mint one — a Play Services problem, not a refusal. Reporting it
+  // as "denied" is what taught managers to stop trying; the OS permission is
+  // already granted, so the next launch self-heals via ensure...Registered().
+  if (!token) {
+    console.error("[push] permission granted but no FCM token was issued");
+    return "denied";
+  }
   return (await saveToken(token)) ? "enabled" : "denied";
 }
 
@@ -131,7 +225,7 @@ export async function enableNativePush(): Promise<"enabled" | "denied"> {
  * so nothing is dispatched here any more.
  */
 export async function disableNativePush(): Promise<void> {
-  const token = await tokenPromise;
+  const token = lastToken ?? (await awaitToken(4_000));
   if (token) {
     await supabase.from("push_subscriptions").delete().eq("endpoint", token);
   }

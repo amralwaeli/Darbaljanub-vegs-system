@@ -120,6 +120,8 @@ export const ar: Strings = {
   vendorOrdersTitle: "طلبات الموردين",
   selectVendor: "إرسال إلى المورد",
   buildOrder: "إنشاء الطلب",
+  selectAll: "تحديد الكل",
+  clearSelection: "إلغاء التحديد",
   itemsSelected: "صنف محدد",
   openWhatsApp: "إرسال عبر واتساب",
   orderSentTo: "تم تسجيل الطلب لـ",

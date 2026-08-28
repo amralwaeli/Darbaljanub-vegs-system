@@ -123,6 +123,8 @@ export const en = {
   vendorOrdersTitle: "Vendor orders",
   selectVendor: "Send to vendor",
   buildOrder: "Build order",
+  selectAll: "Select all",
+  clearSelection: "Clear",
   itemsSelected: "items selected",
   openWhatsApp: "Send via WhatsApp",
   orderSentTo: "Order recorded for",

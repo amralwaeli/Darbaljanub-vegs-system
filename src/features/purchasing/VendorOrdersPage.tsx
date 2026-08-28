@@ -94,13 +94,25 @@ export default function VendorOrdersPage() {
 
   const storeRequests = (requests ?? []).filter((r) => r.store_id === storeId);
   const storeName = storeRequests[0]?.store.name ?? "";
-  // Every line the branch asked for, across all of its orders.
-  const lines = storeRequests
-    .flatMap((r) => r.request_items)
-    .filter(
-      (line) =>
-        !categoryFilter || (line.item.category_id ?? "") === categoryFilter,
-    );
+
+  /**
+   * Every line one branch asked for in one category, across all of its orders.
+   *
+   * A function rather than just the rendered list because the branch and
+   * category pickers need it for the selection they are ABOUT to switch to,
+   * which the current render has not computed yet.
+   */
+  const linesOf = (store: string, category: string) =>
+    (requests ?? [])
+      .filter((r) => r.store_id === store)
+      .flatMap((r) => r.request_items)
+      .filter(
+        (line) => !category || (line.item.category_id ?? "") === category,
+      );
+
+  const lines = linesOf(storeId, categoryFilter);
+  const allSelected =
+    lines.length > 0 && lines.every((line) => selected.has(line.id));
 
   // Default to the first branch, and drop a selection that no longer exists.
   useEffect(() => {
@@ -186,8 +198,16 @@ export default function VendorOrdersPage() {
             className="mb-3"
             value={storeId}
             onChange={(e) => {
-              setStoreId(e.target.value);
-              setSelected(new Set()); // a tick on one branch means nothing on another
+              const nextStore = e.target.value;
+              setStoreId(nextStore);
+              // A tick on one branch means nothing on another — but if the
+              // manager is buying a whole category, they are buying it for
+              // this branch too, so carry the "all of it" intent over.
+              setSelected(
+                categoryFilter
+                  ? new Set(linesOf(nextStore, categoryFilter).map((l) => l.id))
+                  : new Set(),
+              );
             }}
           >
             {branches.map((b) => (
@@ -206,9 +226,20 @@ export default function VendorOrdersPage() {
               className="mb-3"
               value={categoryFilter}
               onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                // Ticks and the chosen vendor belong to the old category.
-                setSelected(new Set());
+                const nextCategory = e.target.value;
+                setCategoryFilter(nextCategory);
+                // Choosing a category IS choosing its items: one category,
+                // one vendor, one message (0019). The manager buys الورقيات
+                // as a basket, so tick the whole basket rather than making
+                // them tap twenty rows to say what the dropdown already said.
+                setSelected(
+                  nextCategory
+                    ? new Set(
+                        linesOf(storeId, nextCategory).map((l) => l.id),
+                      )
+                    : new Set(),
+                );
+                // The chosen vendor belonged to the old category.
                 setVendorId("");
               }}
             >
@@ -220,6 +251,26 @@ export default function VendorOrdersPage() {
                 </option>
               ))}
             </Select>
+          )}
+
+          {lines.length > 0 && (
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-gray-500">
+                {selected.size}/{lines.length} {t.itemsSelected}
+              </span>
+              <button
+                onClick={() =>
+                  setSelected(
+                    allSelected
+                      ? new Set()
+                      : new Set(lines.map((l) => l.id)),
+                  )
+                }
+                className="min-h-9 rounded-xl px-3 text-sm font-semibold text-brand-700 active:bg-brand-50"
+              >
+                {allSelected ? t.clearSelection : t.selectAll}
+              </button>
+            </div>
           )}
 
           <div className="space-y-2">

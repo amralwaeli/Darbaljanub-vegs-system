@@ -49,7 +49,20 @@ export async function isPushEnabled(): Promise<boolean> {
   if (isNative) return isNativePushEnabled();
   if (!pushSupported() || Notification.permission !== "granted") return false;
   const registration = await navigator.serviceWorker.ready;
-  return (await registration.pushManager.getSubscription()) !== null;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return false;
+
+  // A browser subscription the SERVER does not know about receives nothing.
+  // That is not a hypothetical: send-push prunes an endpoint the moment it
+  // 404s, and the bell went on claiming "notifications are on" afterwards.
+  // RLS scopes this to the caller's own rows, so an endpoint now owned by
+  // whoever signed in here last also correctly reads as off.
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .select("id")
+    .eq("endpoint", subscription.endpoint)
+    .maybeSingle();
+  return !error && Boolean(data);
 }
 
 /**

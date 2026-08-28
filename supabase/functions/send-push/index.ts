@@ -110,14 +110,17 @@ function base64Url(bytes: Uint8Array): string {
     .replace(/=+$/, "");
 }
 
-function pemToPkcs8(pem: string): Uint8Array {
+function pemToPkcs8(pem: string): ArrayBuffer {
   // Service-account JSON often stores newlines escaped as \n — normalise
   // before stripping the armour, or atob() chokes.
   const body = pem
     .replace(/\\n/g, "\n")
     .replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "")
     .replace(/\s+/g, "");
-  return Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+  // The ArrayBuffer, not the view: importKey wants a BufferSource whose
+  // backing buffer is definitely an ArrayBuffer, and a Uint8Array typed as
+  // ArrayBufferLike fails that check under a strict deploy.
+  return Uint8Array.from(atob(body), (c) => c.charCodeAt(0)).buffer as ArrayBuffer;
 }
 
 // Access tokens last an hour; a warm instance reuses one rather than paying a
@@ -240,8 +243,41 @@ Deno.serve(async (req) => {
   if (!WEBHOOK_SECRET || req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
     return new Response("forbidden", { status: 403 });
   }
-  // Either transport alone is useful; only having neither is a misconfig.
   const webPushReady = Boolean(VAPID_PUBLIC && VAPID_PRIVATE);
+
+  let event: string;
+  // Shape varies by event (a store_requests row, an order_cycles row, a
+  // deliveries row); each branch below reads only the fields it knows.
+  // deno-lint-ignore no-explicit-any
+  let record: any;
+  try {
+    ({ event, record } = await req.json());
+  } catch {
+    return new Response("bad request", { status: 400 });
+  }
+
+  // ---------------------------------------------------------- __status__ ---
+  // Which transports are actually configured on THIS deployment. Secret-gated
+  // like everything else, and it reports booleans only — no keys, no data.
+  //
+  // It exists because the failure it diagnoses is completely silent: an unset
+  // FCM_SERVICE_ACCOUNT makes every android row a no-op, and the only trace
+  // is a log line nobody reads. "Notifications don't work" was unanswerable
+  // from outside the project without this.
+  if (event === "__status__") {
+    return new Response(
+      JSON.stringify({
+        webPush: webPushReady,
+        fcm: Boolean(serviceAccount),
+        fcmProject: serviceAccount?.project_id ?? null,
+        vapidSubject: VAPID_SUBJECT,
+        appUrl: APP_URL,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Either transport alone is useful; only having neither is a misconfig.
   if (!webPushReady && !serviceAccount) {
     console.error("neither VAPID keys nor FCM_SERVICE_ACCOUNT configured");
     return new Response("not configured", { status: 500 });
@@ -252,7 +288,6 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
   try {
-    const { event, record } = await req.json();
 
     // ---------------------------------------------- resolve recipients -----
     let userIds: string[] = [];

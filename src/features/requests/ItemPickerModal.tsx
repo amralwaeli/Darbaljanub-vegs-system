@@ -49,6 +49,10 @@ export function ItemPickerModal({
     queryKey: ["items", "catalog"],
     queryFn: fetchCatalog,
     enabled: open,
+    // The whole catalogue, and it changes when the manager adds an item —
+    // which is not something worth paying a second of latency for every time
+    // the picker opens. Realtime + the manager's own invalidations cover it.
+    staleTime: 10 * 60_000,
   });
 
   // Every active user may read categories (0019 RLS), so the branch gets the

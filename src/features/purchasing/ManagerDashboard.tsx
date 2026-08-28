@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useOpenCycle, useWorkingCycle, cycleKeys } from "../cycles/useCycle";
+import { useOpenCycle, cycleKeys } from "../cycles/useCycle";
 import { useRealtimeInvalidate } from "../../hooks/useRealtime";
 import {
   addRequestItem,
@@ -46,7 +46,6 @@ export default function ManagerDashboard() {
   // Branches file into the OPEN cycle, which always exists. The working cycle
   // is the order already sent to the market, if one is still out.
   const { data: cycle, isLoading: cycleLoading } = useOpenCycle();
-  const { data: working } = useWorkingCycle();
   const [tab, setTab] = useState<"stores" | "aggregated">("stores");
   /** "" = every category. Narrows both tabs to one category at a time (0019). */
   const [categoryFilter, setCategoryFilter] = useState<string>("");
@@ -60,7 +59,6 @@ export default function ManagerDashboard() {
   >(null);
 
   const cycleId = cycle?.id ?? "";
-  const orderInFlight = Boolean(working && working.status !== "COMPLETED");
 
   const { data: requests, isLoading } = useQuery({
     queryKey: allRequestsKey(cycleId),
@@ -355,12 +353,6 @@ export default function ManagerDashboard() {
         </div>
       )}
 
-      {orderInFlight && (
-        <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {t.orderInFlight}
-        </p>
-      )}
-
       <ConfirmDialog
         open={deleteTarget !== null}
         title={t.remove}
@@ -391,7 +383,10 @@ export default function ManagerDashboard() {
 
       {/* No "lock the cycle" step: sending the order to a vendor on the
           WhatsApp tab is what closes this cycle (migration 0012). */}
-      {(requests ?? []).length > 0 && !orderInFlight && (
+      {/* Deliberately NOT gated on a previous order still being out for
+          delivery: today's list is ready to buy the moment a branch sends it,
+          and yesterday's truck has nothing to do with that. */}
+      {(requests ?? []).length > 0 && (
         <p className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
           {t.readyToOrder}
         </p>

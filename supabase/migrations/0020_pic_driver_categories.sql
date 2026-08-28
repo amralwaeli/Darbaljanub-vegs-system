@@ -292,3 +292,154 @@ comment on view public.driver_delivery_items is
 
 grant select on public.driver_delivery_items to authenticated;
 revoke all on public.driver_delivery_items from anon;
+
+
+-- ============================================================================
+-- C. Notifications — make the pipeline observable, then re-assert every
+--    trigger that drives it.
+--
+-- Symptom: notifications reached nobody, on any account, while the app
+-- cheerfully showed the bell as ON.
+--
+-- What was verified from outside: app_config holds both edge_base_url and
+-- push_webhook_secret; the send-push function is deployed and accepts the
+-- secret; devices ARE registering (7 rows, 5 web + 2 android). What could NOT
+-- be verified from outside is whether these triggers survived the same partial
+-- migration that ate the end of 0019 — notify_push() swallows every error by
+-- design, so a missing trigger and a broken one look identical: silence.
+--
+-- Hence both halves below. The log turns the next failure into a row you can
+-- read; the re-assert removes "the trigger isn't there" from the list of
+-- things it could be.
+-- ============================================================================
+
+-- --------------------------------------------------- push_dispatch_log -----
+-- Service-side only, like app_config: RLS on with NO policies, so no client
+-- role can read or write it. pg_net is asynchronous and returns a request id;
+-- keeping it lets you join to net._http_response and see the status the Edge
+-- Function actually returned:
+--
+--   select l.created_at, l.event, l.error, r.status_code, r.content
+--   from public.push_dispatch_log l
+--   left join net._http_response r on r.id = l.request_id
+--   order by l.created_at desc limit 20;
+create table if not exists public.push_dispatch_log (
+  id         bigserial primary key,
+  event      text not null,
+  request_id bigint,
+  error      text,
+  created_at timestamptz not null default now()
+);
+alter table public.push_dispatch_log enable row level security;
+revoke all on public.push_dispatch_log from anon, authenticated;
+
+create index if not exists push_dispatch_log_created_idx
+  on public.push_dispatch_log (created_at desc);
+
+-- ------------------------------------------------------- notify_push -------
+-- Unchanged in behaviour with one addition: it records what it did. A failure
+-- STILL never blocks the business write — that rule is why the pipeline is
+-- allowed to be fire-and-forget in the first place — but it is no longer
+-- invisible.
+create or replace function public.notify_push()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $fn$
+declare
+  base_url text;
+  secret   text;
+  req_id   bigint;
+begin
+  select value into base_url from public.app_config where key = 'edge_base_url';
+  select value into secret   from public.app_config where key = 'push_webhook_secret';
+  if coalesce(base_url, '') = '' or coalesce(secret, '') = '' then
+    insert into public.push_dispatch_log (event, error)
+    values (tg_argv[0], 'app_config not set: edge_base_url or push_webhook_secret is empty');
+    return coalesce(new, old);
+  end if;
+
+  select net.http_post(
+    url     := base_url || '/functions/v1/send-push',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-webhook-secret', secret
+    ),
+    body    := jsonb_build_object(
+      'event',  tg_argv[0],
+      'record', to_jsonb(new)
+    )
+  ) into req_id;
+
+  insert into public.push_dispatch_log (event, request_id)
+  values (tg_argv[0], req_id);
+
+  return coalesce(new, old);
+exception when others then
+  -- Logged, never raised. A nested block so that a failure to log — the log
+  -- table missing, say — still cannot take a delivery update down with it.
+  begin
+    insert into public.push_dispatch_log (event, error)
+    values (tg_argv[0], left(sqlerrm, 500));
+  exception when others then
+    null;
+  end;
+  return coalesce(new, old);
+end $fn$;
+
+-- ----------------------------------------------- the six notify triggers ----
+-- Re-asserted exactly as 0008 / 0010 / 0012 / 0015 define them. Each is
+-- dropped first, so this converges whatever state the database is in.
+
+-- A branch SENT its list (0012 replaced 0008's on-INSERT version, which fired
+-- on the first item added instead of on the finished list).
+drop trigger if exists t_notify_request_submitted on public.store_requests;
+create trigger t_notify_request_submitted
+  after update on public.store_requests
+  for each row
+  when (old.status = 'DRAFT' and new.status = 'SUBMITTED')
+  execute function public.notify_push('request_submitted');
+
+-- The manager sent the first vendor order: the cycle locks (0010).
+drop trigger if exists t_notify_order_sent on public.order_cycles;
+create trigger t_notify_order_sent
+  after update on public.order_cycles
+  for each row
+  when (old.status = 'OPEN' and new.status = 'ORDERED')
+  execute function public.notify_push('order_sent');
+
+-- Costs are in: PICs price, drivers load. Same transition, two audiences.
+drop trigger if exists t_notify_costs_ready on public.order_cycles;
+create trigger t_notify_costs_ready
+  after update on public.order_cycles
+  for each row
+  when (old.status is distinct from new.status and new.status = 'PURCHASED')
+  execute function public.notify_push('costs_ready');
+
+drop trigger if exists t_notify_deliveries_ready on public.order_cycles;
+create trigger t_notify_deliveries_ready
+  after update on public.order_cycles
+  for each row
+  when (old.status is distinct from new.status and new.status = 'PURCHASED')
+  execute function public.notify_push('deliveries_ready');
+
+drop trigger if exists t_notify_delivery_loaded on public.deliveries;
+create trigger t_notify_delivery_loaded
+  after update on public.deliveries
+  for each row
+  when (old.status is distinct from new.status and new.status = 'LOADED')
+  execute function public.notify_push('delivery_loaded');
+
+drop trigger if exists t_notify_delivery_offloaded on public.deliveries;
+create trigger t_notify_delivery_offloaded
+  after update on public.deliveries
+  for each row
+  when (old.status is distinct from new.status and new.status = 'OFFLOADED')
+  execute function public.notify_push('delivery_offloaded');
+
+drop trigger if exists t_notify_delivery_received on public.deliveries;
+create trigger t_notify_delivery_received
+  after update on public.deliveries
+  for each row
+  when (old.status is distinct from new.status and new.status = 'RECEIVED')
+  execute function public.notify_push('delivery_received');
