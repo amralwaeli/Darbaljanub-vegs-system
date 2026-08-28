@@ -48,18 +48,43 @@ interface ServiceAccount {
   private_key: string;
 }
 
-/** Parsed once at cold start; null simply means "FCM not configured". */
+// Parsed once at cold start. `fcmConfigError` is the whole point: "not set",
+// "set but mangled on paste", and "set but missing fields" are three different
+// problems with three different fixes, and every one of them used to present
+// as the same silent nothing.
+let fcmConfigError: string | null = null;
+
 const serviceAccount: ServiceAccount | null = (() => {
-  if (!FCM_SERVICE_ACCOUNT) return null;
+  if (!FCM_SERVICE_ACCOUNT) {
+    fcmConfigError = "FCM_SERVICE_ACCOUNT is not set on this project";
+    return null;
+  }
   try {
     const parsed = JSON.parse(FCM_SERVICE_ACCOUNT) as ServiceAccount;
-    if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
-      console.error("FCM_SERVICE_ACCOUNT is missing required fields");
+    const missing = (
+      ["project_id", "client_email", "private_key"] as const
+    ).filter((field) => !parsed[field]);
+    if (missing.length > 0) {
+      fcmConfigError =
+        `FCM_SERVICE_ACCOUNT parsed but is missing: ${missing.join(", ")}`;
+      console.error(fcmConfigError);
+      return null;
+    }
+    if (!/BEGIN PRIVATE KEY/.test(parsed.private_key)) {
+      fcmConfigError =
+        "FCM_SERVICE_ACCOUNT private_key does not look like a PEM key — " +
+        "it was probably truncated or had its newlines stripped when pasted";
+      console.error(fcmConfigError);
       return null;
     }
     return parsed;
   } catch (e) {
-    console.error("FCM_SERVICE_ACCOUNT is not valid JSON:", e);
+    // The common one: multi-line JSON pasted into a field that mangles it.
+    fcmConfigError =
+      `FCM_SERVICE_ACCOUNT is set but is not valid JSON (${
+        e instanceof Error ? e.message : String(e)
+      }) — paste the file contents verbatim, including { and }`;
+    console.error(fcmConfigError);
     return null;
   }
 })();
@@ -127,9 +152,13 @@ function pemToPkcs8(pem: string): ArrayBuffer {
 // round-trip per notification.
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-async function fcmAccessToken(sa: ServiceAccount): Promise<string | null> {
+async function fcmAccessToken(
+  sa: ServiceAccount,
+): Promise<{ token: string | null; error: string | null }> {
   const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedToken.expiresAt > now + 60) return cachedToken.value;
+  if (cachedToken && cachedToken.expiresAt > now + 60) {
+    return { token: cachedToken.value, error: null };
+  }
 
   try {
     const encoder = new TextEncoder();
@@ -170,8 +199,14 @@ async function fcmAccessToken(sa: ServiceAccount): Promise<string | null> {
     });
 
     if (!response.ok) {
-      console.error("FCM token exchange failed:", await response.text());
-      return null;
+      // Google rejected the service account: wrong project, key revoked, or
+      // the Firebase Cloud Messaging API not enabled on the project.
+      const detail = (await response.text()).slice(0, 300);
+      console.error("FCM token exchange failed:", detail);
+      return {
+        token: null,
+        error: `Google rejected the service account (HTTP ${response.status}): ${detail}`,
+      };
     }
 
     const json = (await response.json()) as {
@@ -182,10 +217,13 @@ async function fcmAccessToken(sa: ServiceAccount): Promise<string | null> {
       value: json.access_token,
       expiresAt: now + (json.expires_in ?? 3600),
     };
-    return cachedToken.value;
+    return { token: cachedToken.value, error: null };
   } catch (e) {
-    console.error("FCM token mint failed:", e);
-    return null;
+    // Almost always the private key: mangled newlines survive JSON.parse but
+    // fail at importKey.
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("FCM token mint failed:", detail);
+    return { token: null, error: `Could not sign the FCM request: ${detail}` };
   }
 }
 
@@ -195,6 +233,7 @@ async function sendFcm(
   accessToken: string,
   projectId: string,
   message: { title: string; body: string },
+  notes: string[],
 ): Promise<"sent" | "dead" | "failed"> {
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -231,6 +270,7 @@ async function sendFcm(
   const unregistered = response.status === 404 || /UNREGISTERED/.test(body);
   if (!unregistered) {
     console.error("FCM send failed:", response.status, body.slice(0, 200));
+    notes.push(`FCM send failed (HTTP ${response.status}): ${body.slice(0, 200)}`);
   }
   return unregistered ? "dead" : "failed";
 }
@@ -270,6 +310,10 @@ Deno.serve(async (req) => {
         webPush: webPushReady,
         fcm: Boolean(serviceAccount),
         fcmProject: serviceAccount?.project_id ?? null,
+        fcmClientEmail: serviceAccount?.client_email ?? null,
+        // Null when FCM is healthy. When it is not, this says exactly which
+        // of "unset / mangled / incomplete" it is.
+        fcmError: fcmConfigError,
         vapidSubject: VAPID_SUBJECT,
         appUrl: APP_URL,
       }),
@@ -371,12 +415,37 @@ Deno.serve(async (req) => {
 
     let sent = 0;
     const dead: string[] = [];
+    // Everything that stopped a device being reached. A dispatch that reaches
+    // nobody must be able to say WHY without anyone reading a log stream.
+    const notes: string[] = [];
+
+    const androidCount = (subs ?? []).filter(
+      (row) => row.platform === "android",
+    ).length;
+    const webCount = (subs ?? []).length - androidCount;
 
     // One OAuth token covers every android row in this dispatch.
-    const accessToken =
-      serviceAccount && (subs ?? []).some((row) => row.platform === "android")
-        ? await fcmAccessToken(serviceAccount)
-        : null;
+    let accessToken: string | null = null;
+    if (androidCount > 0) {
+      if (!serviceAccount) {
+        notes.push(
+          `${androidCount} android device(s) skipped — ${
+            fcmConfigError ?? "FCM is not configured"
+          }`,
+        );
+      } else {
+        const auth = await fcmAccessToken(serviceAccount);
+        accessToken = auth.token;
+        if (!accessToken) {
+          notes.push(
+            `${androidCount} android device(s) skipped — ${auth.error}`,
+          );
+        }
+      }
+    }
+    if (webCount > 0 && !webPushReady) {
+      notes.push(`${webCount} web device(s) skipped — VAPID keys are not set`);
+    }
 
     await Promise.all(
       (subs ?? []).map(async (sub) => {
@@ -389,6 +458,7 @@ Deno.serve(async (req) => {
               accessToken,
               serviceAccount.project_id,
               message,
+              notes,
             );
             if (result === "sent") sent++;
             else if (result === "dead") dead.push(sub.id);
@@ -416,6 +486,9 @@ Deno.serve(async (req) => {
             dead.push(sub.id); // device unsubscribed / app uninstalled
           } else {
             console.error("push failed:", status, sub.endpoint.slice(0, 50));
+            notes.push(
+              `Web Push failed (HTTP ${status}) for ${sub.endpoint.slice(0, 40)}…`,
+            );
           }
         }
       }),
@@ -425,10 +498,33 @@ Deno.serve(async (req) => {
       await admin.from("push_subscriptions").delete().in("id", dead);
     }
 
-    return new Response(JSON.stringify({ sent, pruned: dead.length }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    if (userIds.length > 0 && (subs ?? []).length === 0) {
+      notes.push(
+        `${userIds.length} recipient(s) for this event have no registered device`,
+      );
+    }
+
+    // Persist ONLY failures, so push_dispatch_log stays readable: rows with a
+    // request_id came from the trigger, rows with an error came from here.
+    // A dispatch where everyone was reached writes nothing.
+    if (notes.length > 0) {
+      await admin
+        .from("push_dispatch_log")
+        .insert({ event, error: notes.join(" | ").slice(0, 2000) });
+    }
+
+    return new Response(
+      JSON.stringify({
+        sent,
+        pruned: dead.length,
+        devices: (subs ?? []).length,
+        android: androidCount,
+        web: webCount,
+        recipients: userIds.length,
+        notes,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
   } catch (e) {
     console.error("send-push fatal:", e);
     return new Response("error", { status: 500 });
