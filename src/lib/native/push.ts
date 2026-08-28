@@ -218,6 +218,75 @@ export async function enableNativePush(): Promise<"enabled" | "denied"> {
 }
 
 /**
+ * Ask the OS for the notification permission at FIRST LAUNCH, before anyone
+ * has signed in — what every other Android app does the moment it opens.
+ *
+ * Deliberately separate from saving the token. At first launch there is no
+ * session yet, so register_push_subscription would refuse ("Not authorized").
+ * What matters here is getting the permission and starting the token flow;
+ * the token lands in `lastToken`, and ensureNativePushRegistered() writes it
+ * to the server as soon as somebody signs in.
+ *
+ * On Android 12 and below notifications are granted at install time, so
+ * checkPermissions() already says "granted" and this just registers.
+ */
+export async function requestNativePermission(): Promise<
+  "granted" | "denied" | "skip"
+> {
+  if (!isNative) return "skip";
+  try {
+    const { PushNotifications } = await pushPlugin();
+    let status = await PushNotifications.checkPermissions();
+
+    if (status.receive !== "granted") {
+      // Hard-denied at OS level: re-asking shows no dialog, only Settings can
+      // undo it. Nothing to gain by asking again on every launch.
+      if (status.receive === "denied") return "denied";
+      status = await PushNotifications.requestPermissions();
+      if (status.receive !== "granted") return "denied";
+    }
+
+    // Listeners BEFORE register(), or the token Android emits has no one
+    // listening for it.
+    await ensureListeners();
+    await PushNotifications.register();
+    return "granted";
+  } catch (e) {
+    console.error("[push] permission request failed", e);
+    return "denied";
+  }
+}
+
+/**
+ * Ask for the notification permission WITHOUT waiting for the user to find
+ * the bell — what every other Android app does on first launch.
+ *
+ * This is native-only and it has to be: on the web, Notification.requestPermission()
+ * is only honoured from a real user gesture, which is why the prompt card
+ * exists at all. Android has no such rule, so in the APK there is no reason to
+ * make staff hunt for a switch before the app can reach them.
+ *
+ * "skip" means there is nothing to ask for — already granted (the caller's
+ * ensure...Registered() handles that), or hard-denied at OS level, where
+ * re-asking shows no dialog and only the system settings can undo it.
+ */
+export async function autoEnableNativePush(): Promise<
+  "enabled" | "denied" | "skip"
+> {
+  if (!isNative) return "skip";
+  try {
+    const { PushNotifications } = await pushPlugin();
+    const status = await PushNotifications.checkPermissions();
+    if (status.receive === "granted") return "skip";
+    if (status.receive === "denied") return "skip";
+    return await enableNativePush();
+  } catch (e) {
+    console.error("[push] auto-enable failed", e);
+    return "denied";
+  }
+}
+
+/**
  * Stop notifications for this device.
  *
  * The OS permission itself can only be revoked by the user in system settings,

@@ -8,12 +8,14 @@ import { useWorkingCycle } from "../features/cycles/useCycle";
 import { useRealtimeInvalidate } from "../hooks/useRealtime";
 import { cycleKeys } from "../features/cycles/useCycle";
 import {
+  autoEnablePush,
   disablePush,
   enablePush,
   ensurePushRegistered,
   isPushEnabled,
   pushSupported,
 } from "../lib/push";
+import { isNative } from "../lib/native/index";
 import { t, toggleLanguage } from "../i18n/strings";
 import type { CycleStatus } from "../lib/database.types";
 
@@ -105,8 +107,31 @@ function NotificationPrompt() {
       // Already allowed on this device? Register it and stay silent.
       if (await ensurePushRegistered()) return;
       if (cancelled) return;
+
+      // APK: ask Android straight away rather than waiting for someone to
+      // discover the bell. This is why every manager had zero registered
+      // devices — see below for the other half of that story.
+      if (isNative) {
+        if ((await autoEnablePush()) === "enabled") return;
+        if (cancelled) return;
+      }
+
       // Blocked at OS level — the card cannot help, so don't nag.
-      if (Notification.permission === "denied") return;
+      //
+      // GUARDED, because `Notification` DOES NOT EXIST in Android's WebView.
+      // pushSupported() short-circuits to true for native, so this line was
+      // reached in the APK and threw, rejecting the whole async block before
+      // setShow(true). The enable-notifications card had therefore never
+      // appeared on a phone even once, leaving the bell — which was itself
+      // failing on the token race — as the only way in.
+      if (
+        !isNative &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "denied"
+      ) {
+        return;
+      }
+
       const snoozed = Number(localStorage.getItem(PUSH_PROMPT_KEY) ?? "0");
       if (snoozed && Date.now() - snoozed < SNOOZE_MS) return;
       setShow(true);

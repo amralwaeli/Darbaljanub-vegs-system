@@ -9,7 +9,10 @@ import { initOfflineQueue } from "./lib/offlineQueue";
 import { LANG, IS_RTL } from "./i18n/strings";
 import { isNative } from "./lib/native/index";
 import { initNativeShell } from "./lib/native/shell";
-import { initNativePushListeners } from "./lib/native/push";
+import {
+  initNativePushListeners,
+  requestNativePermission,
+} from "./lib/native/push";
 import { checkForUpdate, markLaunchSuccessful } from "./lib/native/updater";
 import "./index.css";
 
@@ -56,10 +59,18 @@ if (isNative) {
   // Tapping a notification deep-links into the app. The payload carries an
   // app-relative path precisely so it does not depend on the website's
   // /<repo>/ base, which the APK does not have.
+  //
+  // Then ask for the notification permission immediately — notifications are
+  // ON by default in this app, and the OS dialog belongs at first launch like
+  // it does in every other Android app. Waiting for someone to discover the
+  // bell in the header is why managers and drivers were unreachable for
+  // weeks. Writing the token to the server happens later, on first sign-in
+  // (AuthProvider -> Layout -> ensurePushRegistered), because there is no
+  // session to attach it to yet.
   void initNativePushListeners((path) => {
     window.history.pushState({}, "", path);
     window.dispatchEvent(new PopStateEvent("popstate"));
-  });
+  }).then(() => requestNativePermission());
 
   // A phone left open all day still picks up today's deploy: re-check
   // whenever the app returns to the foreground (rate-limited internally).

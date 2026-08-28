@@ -12,6 +12,7 @@
 import { supabase } from "./supabase";
 import { isNative } from "./native/index";
 import {
+  autoEnableNativePush,
   disableNativePush,
   enableNativePush,
   ensureNativePushRegistered,
@@ -133,6 +134,18 @@ export async function enablePush(): Promise<"enabled" | "denied"> {
   });
   if (error) throw new Error(error.message);
   return "enabled";
+}
+
+/**
+ * Register this device with no user interaction, where the platform allows it.
+ *
+ * APK: asks Android directly, on first launch, like any other app.
+ * Web:  returns "skip" — browsers only honour a permission request that comes
+ *       from a user gesture, so the prompt card is the only lawful route.
+ */
+export async function autoEnablePush(): Promise<"enabled" | "denied" | "skip"> {
+  if (!isNative) return "skip";
+  return autoEnableNativePush();
 }
 
 /** Remove this device's subscription (server row first, then browser). */
