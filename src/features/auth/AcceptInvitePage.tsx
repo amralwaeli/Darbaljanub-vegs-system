@@ -4,6 +4,7 @@ import { useAuth } from "./AuthProvider";
 import { completeAccountSetup } from "../../lib/api/auth";
 import { ApiError } from "../../lib/api/helpers";
 import { Button, Input, Spinner } from "../../components/ui";
+import { digitsOnly } from "../../lib/text";
 import { t } from "../../i18n/strings";
 
 /**
@@ -78,22 +79,24 @@ export default function AcceptInvitePage() {
         <Input
           label={t.choosePin}
           type="password"
+          dir="ltr"
           inputMode="numeric"
           maxLength={6}
           required
           className="text-center text-2xl tracking-[0.5em]"
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setPin(digitsOnly(e.target.value))}
         />
         <Input
           label={t.confirmPin}
           type="password"
+          dir="ltr"
           inputMode="numeric"
           maxLength={6}
           required
           className="text-center text-2xl tracking-[0.5em]"
           value={pin2}
-          onChange={(e) => setPin2(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setPin2(digitsOnly(e.target.value))}
         />
 
         {error && (

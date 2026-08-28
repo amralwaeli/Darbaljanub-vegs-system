@@ -21,6 +21,7 @@ export const ar: Strings = {
   choosePin: "اختر رقماً سرياً من 6 أرقام",
   confirmPin: "تأكيد الرقم السري",
   pinMismatch: "الرقمان السريان غير متطابقين",
+  emailInvalid: "أدخل بريدًا إلكترونيًا صحيحًا",
   pinInvalid: "يجب أن يكون الرقم السري 6 أرقام بالضبط",
   usernameRequired: "يرجى إدخال اسمك",
   finishSetup: "إنهاء الإعداد",

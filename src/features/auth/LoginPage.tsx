@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { loginWithPin } from "../../lib/api/auth";
 import { ApiError } from "../../lib/api/helpers";
 import { Button, Input } from "../../components/ui";
+import { digitsOnly, looksLikeEmail, normalizeEmail } from "../../lib/text";
 import { t, toggleLanguage } from "../../i18n/strings";
 
 export default function LoginPage() {
@@ -13,13 +14,21 @@ export default function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    // Validated here rather than by the browser: a native `type="email"`
+    // bubble speaks the BROWSER's language, not the app's, and phrases its
+    // complaint in terms of characters the user cannot see. See lib/text.ts.
+    const address = normalizeEmail(email);
+    if (!looksLikeEmail(address)) {
+      setError(t.emailInvalid);
+      return;
+    }
     if (!/^\d{6}$/.test(pin)) {
       setError(t.pinInvalid);
       return;
     }
     setBusy(true);
     try {
-      await loginWithPin(email.trim().toLowerCase(), pin);
+      await loginWithPin(address, pin);
       // AuthProvider picks the session up; router redirects automatically.
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.loginFailed);
@@ -45,27 +54,40 @@ export default function LoginPage() {
       </div>
 
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
+        {/*
+          type="text", not type="email". The email keyboard still comes up
+          (inputMode), autofill still works (autoComplete), but the browser's
+          own validator is out of the loop — it was rejecting addresses typed
+          on an Arabic layout and explaining why in a language and a vocabulary
+          the user could not act on. dir="ltr" so the address reads left to
+          right inside an otherwise RTL page while it is being typed.
+        */}
         <Input
           label={t.email}
-          type="email"
+          type="text"
+          dir="ltr"
           autoComplete="email"
           inputMode="email"
-          required
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => setEmail(normalizeEmail(e.target.value))}
         />
+        {/* digitsOnly, not replace(/\D/g, ""): JavaScript's \d is ASCII-only,
+            so the old version deleted every Arabic-Indic digit as fast as the
+            keyboard produced it and left the field empty. */}
         <Input
           label={t.pin}
           type="password"
+          dir="ltr"
           inputMode="numeric"
-          pattern="\d{6}"
           maxLength={6}
           placeholder={t.pinHint}
           autoComplete="current-password"
-          required
           className="text-center text-2xl tracking-[0.5em]"
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setPin(digitsOnly(e.target.value))}
         />
 
         {error && (

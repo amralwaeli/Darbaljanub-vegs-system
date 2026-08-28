@@ -20,6 +20,7 @@ import {
 import { useToast } from "../../components/Toast";
 import { ApiError } from "../../lib/api/helpers";
 import { fmtTime } from "../../lib/format";
+import { normalizeEmail } from "../../lib/text";
 import { t } from "../../i18n/strings";
 import type { ProfileWithStore } from "../../lib/types";
 import type { UserRole } from "../../lib/database.types";
@@ -188,10 +189,14 @@ export function UsersAdmin() {
         <div className="space-y-4">
           <Input
             label={t.email}
-            type="email"
+            type="text"
+            dir="ltr"
             inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(normalizeEmail(e.target.value))}
           />
           <Select
             label={t.inviteRole}
@@ -282,10 +287,14 @@ function ResetPinDialog({
       <div className="space-y-4">
         <Input
           label={t.email}
-          type="email"
+          type="text"
+          dir="ltr"
           inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => setEmail(normalizeEmail(e.target.value))}
         />
         <div className="flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={onCancel}>

@@ -19,6 +19,7 @@ export const en = {
   choosePin: "Choose a 6-digit PIN",
   confirmPin: "Confirm PIN",
   pinMismatch: "PINs do not match",
+  emailInvalid: "Enter a valid email address",
   pinInvalid: "PIN must be exactly 6 digits",
   usernameRequired: "Please enter your name",
   finishSetup: "Finish setup",
