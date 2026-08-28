@@ -418,6 +418,11 @@ export interface Database {
           item_emoji: string | null;
           qty: number;
           unit: string;
+          /** 0020 — what the driver groups the checklist by. NULL = unfiled. */
+          category_id: string | null;
+          category_name: string | null;
+          category_emoji: string | null;
+          category_sort: number | null;
         };
         Relationships: [];
       };

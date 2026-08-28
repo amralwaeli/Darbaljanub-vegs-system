@@ -183,6 +183,8 @@ export const en = {
   categoryItemsTitle: "Items in this category",
   categoryItemsSaved: "Items updated",
   categoryEmpty: "No categories yet.",
+  groupByCategory: "By category",
+  showAllItems: "All items",
   filterByCategory: "Category",
   noItemsInCategory: "Nothing in this category yet.",
   vendorCategory: "Supplies category",

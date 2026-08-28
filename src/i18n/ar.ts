@@ -180,6 +180,8 @@ export const ar: Strings = {
   categoryItemsTitle: "أصناف هذه الفئة",
   categoryItemsSaved: "تم تحديث الأصناف",
   categoryEmpty: "لا توجد فئات بعد.",
+  groupByCategory: "حسب الفئة",
+  showAllItems: "كل الأصناف",
   filterByCategory: "الفئة",
   noItemsInCategory: "لا توجد أصناف في هذه الفئة.",
   vendorCategory: "الفئة التي يوردها",
